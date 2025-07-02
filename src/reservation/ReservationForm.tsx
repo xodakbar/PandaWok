@@ -166,68 +166,6 @@ const ReservationForm: React.FC = () => {
     });
   };
 
-  const renderMonthYearPicker = () => {
-    const currentYear = currentMonth.getFullYear();
-    const currentMonthIndex = currentMonth.getMonth();
-    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
-
-    return (
-      <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => setShowMonthYearPicker(false)}
-            className="p-1 hover:bg-gray-100 rounded"
-          >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h3 className="text-lg font-semibold text-gray-800">Seleccionar fecha</h3>
-          <div className="w-7"></div>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
-          <div className="grid grid-cols-5 gap-2">
-            {years.map(year => (
-              <button
-                key={year}
-                onClick={() => handleMonthYearSelect(currentMonthIndex, year)}
-                className={`p-2 rounded-lg text-sm transition-colors ${
-                  year === currentYear
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-blue-100'
-                }`}
-              >
-                {year}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
-          <div className="grid grid-cols-3 gap-2">
-            {months.map((month, index) => (
-              <button
-                key={month}
-                onClick={() => handleMonthYearSelect(index, currentYear)}
-                className={`p-2 rounded-lg text-sm transition-colors ${
-                  index === currentMonthIndex
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-blue-100'
-                }`}
-              >
-                {month}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const getAvailableDates = () => {
     const today = new Date();
     const maxDate = new Date();
@@ -285,7 +223,6 @@ const ReservationForm: React.FC = () => {
     
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-      const isToday = currentDate.toDateString() === today.toDateString();
       const isPast = currentDate < today;
       const isFuture = currentDate > maxDate;
       const isAvailable = !isPast && !isFuture;
@@ -429,7 +366,7 @@ const ReservationForm: React.FC = () => {
             </div>
             
             <div className="grid grid-cols-7 gap-0.5">
-              {days}
+              {days as React.ReactNode[]}
             </div>
           </>
         )}

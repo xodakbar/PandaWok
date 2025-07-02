@@ -119,8 +119,6 @@ const Timeline: React.FC = () => {
 
   const handleTableClick = (table: Table) => {
     setSelectedTable(table);
-    // Auto-show sidebar on mobile when table is clicked
-    setIsSidebarVisible(true);
   };
 
   const handleNewReservation = () => {
@@ -345,6 +343,7 @@ const Timeline: React.FC = () => {
       <Header salones={salonsData} />
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
+        {/* Botón de alternancia para dispositivos móviles - Ajustado posicionamiento */}
         <button 
           className="md:hidden absolute top-2 left-2 z-10 bg-orange-500 p-2 rounded-full shadow-md"
           onClick={() => setIsSidebarVisible(!isSidebarVisible)}
@@ -482,11 +481,12 @@ const Timeline: React.FC = () => {
         {!isReservationDetailsOpen ? (
           <div className="flex-1 bg-slate-100 flex flex-col timeline-container">
                           <div className="bg-white border-b border-gray-200">
-              <div className="md:hidden flex items-center justify-center p-2 bg-white salon-selector-container gap-2">
+              {/* Selector móvil de salones */}
+              <div className="md:hidden flex items-center p-2 bg-white salon-selector-container">
                 <select 
                   value={activeTab}
                   onChange={(e) => setActiveTab(e.target.value)}
-                  className="w-[200px] p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-700 text-sm"
+                  className="flex-1 p-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent salon-selector"
                 >
                   {salonsData.map((salon) => (
                     <option key={salon.id} value={salon.id}>
@@ -496,7 +496,7 @@ const Timeline: React.FC = () => {
                 </select>
                 <button
                   onClick={handleOpenNuevaMesaModal}
-                  className="px-4 py-2 bg-[#FF6900] text-white font-medium rounded-md hover:bg-orange-600 transition-colors flex items-center justify-center shadow-md min-w-[48px]"
+                  className="px-4 py-2 bg-[#FF6900] text-white font-medium rounded-r-md hover:bg-orange-600 transition-colors flex items-center justify-center shadow-md w-12"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -504,6 +504,7 @@ const Timeline: React.FC = () => {
                 </button>
               </div>
 
+              {/* Pestañas de escritorio */}
               <div className="hidden md:flex space-x-0 items-center min-w-max">
                 {salonsData.map((salon) => (
                   <button

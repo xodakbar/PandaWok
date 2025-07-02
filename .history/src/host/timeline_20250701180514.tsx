@@ -119,8 +119,6 @@ const Timeline: React.FC = () => {
 
   const handleTableClick = (table: Table) => {
     setSelectedTable(table);
-    // Auto-show sidebar on mobile when table is clicked
-    setIsSidebarVisible(true);
   };
 
   const handleNewReservation = () => {

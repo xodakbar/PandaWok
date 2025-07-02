@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import EditNoteModal from './EditNoteModal';
+import ClientTagsModal from './ClientTagsModal';
 
 interface ReservationInfo {
   guestName: string;
@@ -52,6 +53,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [newTag, setNewTag] = useState('');
+  const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
 
   const [clientProfile, setClientProfile] = useState<ClientProfile>({
     firstName: table?.reservationInfo?.guestName.split(' ')[0] || '',
@@ -108,21 +110,50 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
     }));
   };
 
-  const handleAddTag = () => {
-    if (newTag.trim()) {
-      setClientProfile(prev => ({
-        ...prev,
-        tags: [...(prev.tags || []), newTag.trim()]
-      }));
-      setNewTag('');
-    }
-  };
-
   const handleRemoveTag = (tagToRemove: string) => {
     setClientProfile(prev => ({
       ...prev,
       tags: (prev.tags || []).filter(tag => tag !== tagToRemove)
     }));
+  };
+
+
+  const getTagColor = (tag: string): string => {
+    const tagCategories = [
+      {
+        tags: ['Area de fumadores', 'Esquina', 'Mesa con Vista', 'Mesa Tranquila', 'Salon principal'],
+        color: 'blue'
+      },
+      {
+        tags: ['Alergia', 'Huevos', 'Libre de gluten', 'Libre de lactosa', 'Mariscos', 'Sin maní', 'Vegano', 'Vegetariano'],
+        color: 'green'
+      },
+      {
+        tags: ['Alto consumo', 'Amigo de empleado', 'Amigo del dueño', 'Blogger', 'Celebridad', 'CEO', 'Cliente frecuente', 'Critico', 'Empleado', 'Inversionista', 'Lista negra', 'No Show', 'Prensa'],
+        color: 'purple'
+      }
+    ];
+
+    for (const category of tagCategories) {
+      if (category.tags.includes(tag)) {
+        return category.color;
+      }
+    }
+
+    return 'orange'; 
+  };
+
+  const getTagStyle = (tag: string): string => {
+    const color = getTagColor(tag);
+
+    const colorClasses: {[key: string]: string} = {
+      blue: 'bg-blue-100 text-blue-800 border-blue-300',
+      green: 'bg-green-100 text-green-800 border-green-300',
+      purple: 'bg-purple-100 text-purple-800 border-purple-300',
+      orange: 'bg-orange-100 text-orange-800 border-orange-300'
+    };
+
+    return colorClasses[color] || colorClasses.orange;
   };
 
   const handleProfileFieldClick = (field: string) => {
@@ -196,7 +227,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
   const renderCalendar = () => {
     const daysInMonth = getDaysInMonth(currentMonth);
     const firstDay = getFirstDayOfMonth(currentMonth);
-    const monthName = currentMonth.toLocaleDateString('es-ES', { month: 'long' });
+    const monthName = currentMonth instanceof Date ? currentMonth.toLocaleDateString('es-ES', { month: 'long' }) : '';
 
     const days = [];
     const { today, maxDate } = getAvailableDates();
@@ -207,7 +238,6 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
 
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-      const isTodayDate = currentDate.toDateString() === today.toDateString();
       const isPast = currentDate < today;
       const isFuture = currentDate > maxDate;
       const isAvailable = !isPast && !isFuture;
@@ -299,18 +329,18 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
 
   return (
     <div
-      className="flex-1 flex flex-col"
+      className="flex-1 flex flex-col w-full lg:w-auto overflow-hidden"
       style={{ backgroundColor: '#F7F7ED' }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between p-6 border-b border-orange-400" style={{ backgroundColor: '#F7F7ED' }}>
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+      <div className="flex items-center justify-between p-3 sm:p-6 border-b border-orange-400" style={{ backgroundColor: '#F7F7ED' }}>
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-lg">
             {table.reservationInfo.guestName.split(' ').map(n => n[0]).join('')}
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-800">{table.reservationInfo.guestName}</h2>
-            <p className="text-sm text-gray-600 font-medium">+(56) 09 9101 3400</p>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">{table.reservationInfo.guestName}</h2>
+            <p className="text-xs sm:text-sm text-gray-600 font-medium">+(56) 09 9101 3400</p>
           </div>
         </div>
         <div className="flex items-center space-x-4">
@@ -333,7 +363,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors duration-200 ${
+            className={`flex-1 px-2 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-medium transition-colors duration-200 ${
               activeTab === tab.id
                 ? 'text-orange-600 border-b-2 border-orange-600 bg-white'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-white hover:bg-opacity-50'
@@ -344,7 +374,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8" style={{ backgroundColor: '#F7F7ED' }}>
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6 md:p-8" style={{ backgroundColor: '#F7F7ED' }}>
         {activeTab === 'reserva' && (
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex justify-between text-sm text-gray-600 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -361,7 +391,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 reservation-details-grid">
               <div>
                 <label className="text-sm text-gray-700 mb-2 block font-semibold">Fecha</label>
                 {editingField === 'date' ? (
@@ -406,7 +436,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                   </select>
                 ) : (
                   <button
-                    onClick={() => startEditing('time', table.reservationInfo?.time)}
+                    onClick={() => startEditing('time', table.reservationInfo?.time ?? '')}
                     className="flex items-center space-x-3 p-3 rounded-lg border-2 border-orange-300 bg-white shadow-sm hover:shadow-md transition-shadow w-full text-left hover:bg-orange-50"
                   >
                     <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -433,7 +463,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                   </select>
                 ) : (
                   <button
-                    onClick={() => startEditing('partySize', table.reservationInfo?.partySize)}
+                    onClick={() => startEditing('partySize', table.reservationInfo?.partySize ?? 1)}
                     className="flex items-center space-x-3 p-3 rounded-lg border-2 border-orange-300 bg-white shadow-sm hover:shadow-md transition-shadow w-full text-left hover:bg-orange-50"
                   >
                     <span className="material-icons text-orange-500 text-xl">group</span>
@@ -473,7 +503,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
               <div>
                 <label className="text-sm text-gray-700 mb-2 block font-semibold">Mesa</label>
                 <button
@@ -556,7 +586,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                     onChange={(e) => handleProfileUpdate('firstName', e.target.value)}
                     onBlur={(e) => handleProfileFieldBlur('firstName', e.target.value)}
                     onKeyDown={(e) => handleProfileFieldKeyDown(e, 'firstName', clientProfile.firstName)}
-                    ref={(el: HTMLInputElement | null) => (inputRefs.current['firstName'] = el)}
+                    ref={(el: HTMLInputElement | null) => { inputRefs.current['firstName'] = el; }}
                     className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
                     autoFocus
                   />
@@ -579,7 +609,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                     onChange={(e) => handleProfileUpdate('lastName', e.target.value)}
                     onBlur={(e) => handleProfileFieldBlur('lastName', e.target.value)}
                     onKeyDown={(e) => handleProfileFieldKeyDown(e, 'lastName', clientProfile.lastName)}
-                    ref={(el: HTMLInputElement | null) => (inputRefs.current['lastName'] = el)}
+                    ref={(el: HTMLInputElement | null) => { inputRefs.current['lastName'] = el; }}
                     className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
                   />
                 ) : (
@@ -602,7 +632,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                     value={clientProfile.birthday || ''}
                     onChange={(e) => handleProfileUpdate('birthday', e.target.value)}
                     onBlur={(e) => handleProfileFieldBlur('birthday', e.target.value)}
-                    ref={(el: HTMLInputElement | null) => (inputRefs.current['birthday'] = el)}
+                    ref={(el: HTMLInputElement | null) => { inputRefs.current['birthday'] = el; }}
                     className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
                   />
                 ) : (
@@ -624,7 +654,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                     onChange={(e) => handleProfileUpdate('company', e.target.value)}
                     onBlur={(e) => handleProfileFieldBlur('company', e.target.value)}
                     onKeyDown={(e) => handleProfileFieldKeyDown(e, 'company', clientProfile.company)}
-                    ref={(el: HTMLInputElement | null) => (inputRefs.current['company'] = el)}
+                    ref={(el: HTMLInputElement | null) => { inputRefs.current['company'] = el; }}
                     className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
                   />
                 ) : (
@@ -648,7 +678,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                     onChange={(e) => handleProfileUpdate('phone', e.target.value)}
                     onBlur={(e) => handleProfileFieldBlur('phone', e.target.value)}
                     onKeyDown={(e) => handleProfileFieldKeyDown(e, 'phone', clientProfile.phone)}
-                    ref={(el: HTMLInputElement | null) => (inputRefs.current['phone'] = el)}
+                    ref={(el: HTMLInputElement | null) => { inputRefs.current['phone'] = el; }}
                     className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
                   />
                 ) : (
@@ -670,7 +700,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                     onChange={(e) => handleProfileUpdate('email', e.target.value)}
                     onBlur={(e) => handleProfileFieldBlur('email', e.target.value)}
                     onKeyDown={(e) => handleProfileFieldKeyDown(e, 'email', clientProfile.email)}
-                    ref={(el: HTMLInputElement | null) => (inputRefs.current['email'] = el)}
+                    ref={(el: HTMLInputElement | null) => { inputRefs.current['email'] = el; }}
                     className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
                   />
                 ) : (
@@ -685,15 +715,17 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
             </div>
 
             <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <h3 className="text-md text-gray-800 font-semibold mb-3">Tags del cliente</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-md text-gray-800 font-semibold">Tags de cliente</h3>
+              </div>
 
               <div className="flex flex-wrap gap-2 mb-4">
                 {(clientProfile.tags || []).map((tag, index) => (
-                  <div key={index} className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm flex items-center">
+                  <div key={index} className={`${getTagStyle(tag)} px-3 py-1 rounded-full text-sm flex items-center border`}>
                     {tag}
                     <button
                       onClick={() => handleRemoveTag(tag)}
-                      className="ml-2 text-orange-800 hover:text-orange-900"
+                      className={`ml-2 hover:opacity-80`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -711,12 +743,13 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                   type="text"
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
-                  placeholder="Nuevo tag..."
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                  onClick={() => setIsTagsModalOpen(true)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 cursor-pointer"
+                  placeholder="Toca para agregar tags..."
+                  readOnly
                 />
                 <button
-                  onClick={handleAddTag}
+                  onClick={() => setIsTagsModalOpen(true)}
                   className="px-4 py-2 bg-orange-500 text-white rounded-r-md hover:bg-orange-600"
                 >
                   Añadir
@@ -732,7 +765,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
                   value={clientProfile.notes || ''}
                   onChange={(e) => handleProfileUpdate('notes', e.target.value)}
                   onBlur={(e) => handleProfileFieldBlur('notes', e.target.value)}
-                  ref={(el: HTMLTextAreaElement | null) => (inputRefs.current['notes'] = el)}
+                  ref={(el: HTMLTextAreaElement | null) => { inputRefs.current['notes'] = el; }}
                   className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent min-h-[120px] text-gray-900"
                   placeholder="Escribe notas sobre este cliente..."
                 />
@@ -750,7 +783,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
       </div>
 
       {activeTab === 'reserva' && (
-        <div className="border-t-2 border-orange-300 p-6 bg-gradient-to-r from-orange-50 to-yellow-50">
+                  <div className="border-t-2 border-orange-300 p-3 sm:p-6 bg-gradient-to-r from-orange-50 to-yellow-50">
           <div className="max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center space-x-6 text-sm">
@@ -795,7 +828,7 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mt-2">
               <button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
                 Sentar
               </button>
@@ -818,6 +851,13 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
         onClose={() => setIsEditingNote(false)}
         onSave={handleNoteEdit}
         currentNote={table?.reservationInfo?.notes || ''}
+      />
+
+      <ClientTagsModal
+        isOpen={isTagsModalOpen}
+        onClose={() => setIsTagsModalOpen(false)}
+        selectedTags={clientProfile.tags || []}
+        onTagsUpdate={(tags) => handleProfileUpdate('tags', tags)}
       />
     </div>
   );
