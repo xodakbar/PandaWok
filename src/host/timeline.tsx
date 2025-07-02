@@ -3,13 +3,23 @@ import Header from '../components/Header';
 import NewReservationModal from '../components/NewReservationModal';
 import ReservationDetailsPanel from '../components/ReservationDetailsPanel';
 import NuevaMesaModal from './NuevaMesaModal';
+import BlockTableModal from '../components/BlockTableModal';
+import WalkInModal from '../components/WalkInModal'; // ¡NUEVO!
+import ChangeTableModal from '../components/ChangeTableModal'; // ¡NUEVO!
+
 
 interface Table {
   id: number;
   shape: 'round' | 'square' | 'rectangular';
   size: 'small' | 'medium' | 'large';
-  occupied?: boolean;
+  occupied?: boolean; 
   reserved?: boolean;
+  isBlocked?: boolean;
+  blockedInfo?: {
+    startTime: string;
+    endTime: string;
+    date: string;
+  };
   reservationInfo?: {
     guestName: string;
     time: string;
@@ -18,6 +28,12 @@ interface Table {
     notes?: string;
     origin?: 'Restaurant' | 'Web';
     createdAt?: string;
+  };
+  walkInInfo?: { // ¡NUEVO! Información para walk-ins
+    guestName: string;
+    partySize: number;
+    notes?: string;
+    seatedAt: string; // Hora y fecha en que se sentó
   };
 }
 
@@ -41,6 +57,15 @@ const Timeline: React.FC = () => {
   const [activeDetailsTab, setActiveDetailsTab] = useState('reserva');
   const [isNuevaMesaModalOpen, setIsNuevaMesaModalOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+
+  // Estados para Bloqueo de Mesas
+  const [isBlockTableModalOpen, setIsBlockTableModalOpen] = useState(false);
+  const [selectedTableToBlock, setSelectedTableToBlock] = useState<Table | null>(null);
+
+  // ¡NUEVOS ESTADOS PARA EL WALK-IN Y CAMBIO DE MESA!
+  const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
+  const [isChangeTableModalOpen, setIsChangeTableModalOpen] = useState(false);
+
 
   const [salonsData, setSalonsData] = useState<Salon[]>([
     {
@@ -117,6 +142,19 @@ const Timeline: React.FC = () => {
     }
   ]);
 
+  // Función para generar las opciones de hora para los selectores
+  const generateTimeOptions = () => {
+    const times = [];
+    for (let i = 0; i < 24; i++) {
+      for (let j = 0; j < 60; j += 30) { // Incrementos de 30 minutos
+        const hour = String(i).padStart(2, '0');
+        const minute = String(j).padStart(2, '0');
+        times.push(`${hour}:${minute}`);
+      }
+    }
+    return times;
+  };
+
   const handleTableClick = (table: Table) => {
     setSelectedTable(table);
     // Auto-show sidebar on mobile when table is clicked
@@ -127,8 +165,11 @@ const Timeline: React.FC = () => {
     setIsReservationModalOpen(true);
   };
 
+  // ¡MODIFICADO! Abre el modal de Walk-in
   const handleWalkIn = () => {
-    console.log('Walk-in para mesa:', selectedTable?.id);
+    if (selectedTable && !selectedTable.reserved && !selectedTable.isBlocked && !selectedTable.occupied) {
+      setIsWalkInModalOpen(true);
+    }
   };
 
   const handleCloseReservationModal = () => {
@@ -226,17 +267,215 @@ const Timeline: React.FC = () => {
     }
   };
 
+  const handleBlockTable = (tableId: number, startTime: string, endTime: string, date: string) => {
+    setSalonsData(prevSalons =>
+      prevSalons.map(salon => ({
+        ...salon,
+        tables: salon.tables.map(table =>
+          table.id === tableId
+            ? {
+                ...table,
+                isBlocked: true,
+                blockedInfo: { startTime, endTime, date },
+                occupied: false, // Asegurarse de que no esté ocupada si se bloquea
+                walkInInfo: undefined,
+                reserved: false, // Asegurarse de que no esté reservada si se bloquea
+                reservationInfo: undefined
+              }
+            : table
+        )
+      }))
+    );
+    if (selectedTable?.id === tableId) {
+      setSelectedTable(prev => prev ? {
+        ...prev,
+        isBlocked: true,
+        blockedInfo: { startTime, endTime, date },
+        occupied: false,
+        walkInInfo: undefined,
+        reserved: false,
+        reservationInfo: undefined
+      } : null);
+    }
+    console.log(`Mesa ${tableId} bloqueada desde ${startTime} hasta ${endTime} el ${date}`);
+    setIsBlockTableModalOpen(false);
+  };
+
+  const handleUnblockTable = (tableId: number) => {
+    setSalonsData(prevSalons =>
+      prevSalons.map(salon => ({
+        ...salon,
+        tables: salon.tables.map(table =>
+          table.id === tableId
+            ? {
+                ...table,
+                isBlocked: false,
+                blockedInfo: undefined
+              }
+            : table
+        )
+      }))
+    );
+    if (selectedTable?.id === tableId) {
+      setSelectedTable(prev => prev ? {
+        ...prev,
+        isBlocked: false,
+        blockedInfo: undefined
+      } : null);
+    }
+    console.log(`Bloqueo de Mesa ${tableId} cancelado.`);
+  };
+
+  // ¡NUEVA FUNCIÓN! Confirma un Walk-in
+  const handleConfirmWalkIn = (tableId: number, guestName: string, partySize: number, notes: string) => {
+    const now = new Date();
+    const seatedAt = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    setSalonsData(prevSalons =>
+      prevSalons.map(salon => ({
+        ...salon,
+        tables: salon.tables.map(table =>
+          table.id === tableId
+            ? {
+                ...table,
+                occupied: true, // Marcar como ocupada
+                walkInInfo: { guestName, partySize, notes, seatedAt },
+                reserved: false, // Asegurarse de que no esté reservada si se ocupa
+                reservationInfo: undefined,
+                isBlocked: false, // Asegurarse de que no esté bloqueada si se ocupa
+                blockedInfo: undefined
+              }
+            : table
+        )
+      }))
+    );
+
+    if (selectedTable?.id === tableId) {
+      setSelectedTable(prev => prev ? {
+        ...prev,
+        occupied: true,
+        walkInInfo: { guestName, partySize, notes, seatedAt },
+        reserved: false,
+        reservationInfo: undefined,
+        isBlocked: false,
+        blockedInfo: undefined
+      } : null);
+    }
+    console.log(`Mesa ${tableId} ocupada por walk-in: ${guestName} (${partySize} personas)`);
+    setIsWalkInModalOpen(false);
+  };
+
+  // ¡NUEVA FUNCIÓN! Finaliza un Walk-in
+  const handleFinalizeWalkIn = (tableId: number) => {
+    setSalonsData(prevSalons =>
+      prevSalons.map(salon => ({
+        ...salon,
+        tables: salon.tables.map(table =>
+          table.id === tableId
+            ? {
+                ...table,
+                occupied: false,
+                walkInInfo: undefined
+              }
+            : table
+        )
+      }))
+    );
+    if (selectedTable?.id === tableId) {
+      setSelectedTable(prev => prev ? {
+        ...prev,
+        occupied: false,
+        walkInInfo: undefined
+      } : null);
+    }
+    console.log(`Walk-in en mesa ${tableId} finalizado.`);
+  };
+
+  // ¡NUEVA FUNCIÓN! Abre el modal para cambiar de mesa
+  const handleChangeTable = () => {
+    if (selectedTable && selectedTable.occupied && selectedTable.walkInInfo) {
+      setIsChangeTableModalOpen(true);
+    }
+  };
+
+  // ¡NUEVA FUNCIÓN! Confirma el cambio de mesa para un Walk-in
+  const handleChangeTableConfirm = (fromTableId: number, toTableId: number) => {
+      const walkInInfoToMove = selectedTable?.walkInInfo;
+
+      if (!walkInInfoToMove) {
+          console.error("No hay información de walk-in para mover.");
+          return;
+      }
+
+      setSalonsData(prevSalons =>
+          prevSalons.map(salon => ({
+              ...salon,
+              tables: salon.tables.map(table => {
+                  if (table.id === fromTableId) {
+                      return { ...table, occupied: false, walkInInfo: undefined }; // Desocupar la mesa original
+                  } else if (table.id === toTableId) {
+                      // Ocupar la nueva mesa, asegurándose de limpiar otros estados
+                      return {
+                          ...table,
+                          occupied: true,
+                          walkInInfo: walkInInfoToMove,
+                          reserved: false,
+                          reservationInfo: undefined,
+                          isBlocked: false,
+                          blockedInfo: undefined
+                      };
+                  }
+                  return table;
+              })
+          }))
+      );
+
+      // Actualizar la mesa seleccionada si fue la que se movió o la nueva ocupada
+      setSelectedTable(prev => {
+          if (prev?.id === fromTableId) {
+              // Encuentra la nueva mesa en el estado actualizado para seleccionarla
+              const newTable = salonsData
+                  .flatMap(s => s.tables) // Usar flatMap para buscar en todos los salones
+                  .find(t => t.id === toTableId);
+              return newTable ? { ...newTable, occupied: true, walkInInfo: walkInInfoToMove } : null;
+          }
+          if (prev?.id === toTableId) {
+               // Si ya estaba seleccionada la nueva mesa, solo actualiza su estado
+              return prev ? { ...prev, occupied: true, walkInInfo: walkInInfoToMove } : null;
+          }
+          return prev;
+      });
+      console.log(`Walk-in movido de Mesa ${fromTableId} a Mesa ${toTableId}`);
+      setIsChangeTableModalOpen(false); // Cierra el modal
+  };
+
+  // ¡NUEVA FUNCIÓN! Obtiene mesas disponibles para el cambio
+  const getAvailableTablesForChange = () => {
+      // Filtra mesas que no estén ocupadas, reservadas o bloqueadas, y que no sean la mesa actual
+      return salonsData.flatMap(salon =>
+          salon.tables
+              .filter(table =>
+                  !table.occupied && !table.reserved && !table.isBlocked && table.id !== selectedTable?.id
+              )
+              .map(table => ({ id: table.id, salonName: salon.name }))
+      );
+  };
+
+
+  // ¡MODIFICADO! getTableStyle para incluir el estado de ocupado
   const getTableStyle = (table: Table) => {
     const baseClasses = "flex items-center justify-center text-white font-medium cursor-pointer transition-all duration-200 hover:scale-105";
 
     let shapeClasses = "";
     let sizeClasses = "";
-    let bgColor = "bg-[#3C2022]";
+    let bgColor = "bg-[#3C2022]"; // Color por defecto (disponible)
 
-    if (table.reserved) {
-      bgColor = "bg-[#8B4513]";
-    } else if (table.occupied) {
+    if (table.occupied) { // ¡NUEVO! Color para mesas ocupadas (walk-in)
       bgColor = "bg-red-600";
+    } else if (table.isBlocked) {
+      bgColor = "bg-purple-700";
+    } else if (table.reserved) {
+      bgColor = "bg-[#8B4513]";
     }
 
     switch (table.shape) {
@@ -259,8 +498,8 @@ const Timeline: React.FC = () => {
         sizeClasses = "w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-xs sm:text-base";
         break;
       case 'large':
-        sizeClasses = table.shape === 'rectangular' 
-          ? "w-14 h-10 sm:w-20 sm:h-12 md:w-24 md:h-16 text-xs sm:text-base" 
+        sizeClasses = table.shape === 'rectangular'
+          ? "w-14 h-10 sm:w-20 sm:h-12 md:w-24 md:h-16 text-xs sm:text-base"
           : "w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 text-xs sm:text-base md:text-lg";
         break;
     }
@@ -313,8 +552,8 @@ const Timeline: React.FC = () => {
 
   const handleAddNewTable = (tableData: NuevaMesaData) => {
     const salon = salonsData.find(s => s.id === tableData.salonId);
-    const newTableId = salon && salon.tables.length > 0 
-      ? Math.max(...salon.tables.map(t => t.id)) + 1 
+    const newTableId = salon && salon.tables.length > 0
+      ? Math.max(...salon.tables.map(t => t.id)) + 1
       : 1;
 
     setSalonsData(prevSalons =>
@@ -345,7 +584,7 @@ const Timeline: React.FC = () => {
       <Header salones={salonsData} />
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
-        <button 
+        <button
           className="md:hidden absolute top-2 left-2 z-10 bg-orange-500 p-2 rounded-full shadow-md"
           onClick={() => setIsSidebarVisible(!isSidebarVisible)}
         >
@@ -428,10 +667,82 @@ const Timeline: React.FC = () => {
                         )}
                       </div>
                     </div>
+                  ) : selectedTable.isBlocked && selectedTable.blockedInfo ? (
+                    <div
+                      className="rounded-lg p-4 space-y-4"
+                      style={{ backgroundColor: '#F7F7ED' }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center text-white font-medium text-lg">
+                          🔒
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-lg text-purple-700">Mesa {selectedTable.id} Bloqueada</h3>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 text-sm text-gray-700">
+                        <p>Desde: {selectedTable.blockedInfo.startTime}</p>
+                        <p>Hasta: {selectedTable.blockedInfo.endTime}</p>
+                        <p>Fecha: {selectedTable.blockedInfo.date}</p>
+                      </div>
+
+                      <button
+                        onClick={() => handleUnblockTable(selectedTable.id)}
+                        className="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 mt-4"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        </svg>
+                        <span>Cancelar Bloqueo</span>
+                      </button>
+                    </div>
+                  ) : selectedTable.occupied && selectedTable.walkInInfo ? ( // ¡NUEVO! Si la mesa está ocupada por un walk-in
+                    <div
+                      className="rounded-lg p-4 space-y-4"
+                      style={{ backgroundColor: '#F7F7ED' }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white font-medium text-lg">
+                          🚶
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-lg text-red-700">Mesa {selectedTable.id} Ocupada (Walk-in)</h3>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 text-sm text-gray-700">
+                        {selectedTable.walkInInfo.guestName && <p>Comensal: {selectedTable.walkInInfo.guestName}</p>}
+                        <p>Personas: {selectedTable.walkInInfo.partySize}</p>
+                        <p>Sentado a las: {selectedTable.walkInInfo.seatedAt}</p>
+                        {selectedTable.walkInInfo.notes && <p>Notas: {selectedTable.walkInInfo.notes}</p>}
+                      </div>
+
+                      <div className="flex space-x-2 mt-4">
+                        <button
+                          onClick={handleChangeTable} // Función para abrir el modal de cambio
+                          className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                          <span>Cambiar de Mesa</span>
+                        </button>
+                        <button
+                          onClick={() => handleFinalizeWalkIn(selectedTable.id)}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Finalizar Walk-in</span>
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="text-center">
-                      <h3 className="text-lg font-medium mb-2">Mesa {selectedTable.id}</h3>
-                      <p className="text-gray-300 text-sm mb-4">Mesa disponible</p>
+                      <h3 className="text-lg font-medium mb-2 text-gray-800">Mesa {selectedTable.id}</h3>
+                      <p className="text-gray-500 text-sm mb-4">Mesa disponible</p>
                     </div>
                   )}
                 </div>
@@ -445,7 +756,7 @@ const Timeline: React.FC = () => {
               )}
             </div>
 
-            {selectedTable && !selectedTable.reserved && (
+            {selectedTable && !selectedTable.reserved && !selectedTable.isBlocked && !selectedTable.occupied && ( // ¡MODIFICADO! Mostrar botones solo si no está reservada, bloqueada o ocupada
               <div className="space-y-3 mt-4">
                 <button
                   onClick={handleNewReservation}
@@ -468,10 +779,19 @@ const Timeline: React.FC = () => {
                     <span>Sentar Walk-in</span>
                   </button>
 
-                  <button className="bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-3 rounded-lg transition-colors">
+                  <button
+                    onClick={() => {
+                      if (selectedTable && !selectedTable.reserved && !selectedTable.isBlocked && !selectedTable.occupied) {
+                        setSelectedTableToBlock(selectedTable);
+                        setIsBlockTableModalOpen(true);
+                      }
+                    }}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
+                    <span>Bloquear Mesa</span>
                   </button>
                 </div>
               </div>
@@ -481,9 +801,9 @@ const Timeline: React.FC = () => {
 
         {!isReservationDetailsOpen ? (
           <div className="flex-1 bg-slate-100 flex flex-col timeline-container">
-                          <div className="bg-white border-b border-gray-200">
+            <div className="bg-white border-b border-gray-200">
               <div className="md:hidden flex items-center justify-center p-2 bg-white salon-selector-container gap-2">
-                <select 
+                <select
                   value={activeTab}
                   onChange={(e) => setActiveTab(e.target.value)}
                   className="w-[200px] p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-700 text-sm"
@@ -530,7 +850,7 @@ const Timeline: React.FC = () => {
               </div>
             </div>
 
-                          <div className="p-4 md:p-6 lg:p-8 h-full overflow-auto">
+            <div className="p-4 md:p-6 lg:p-8 h-full overflow-auto">
               {currentSalon && currentSalon.tables.length > 0 ? (
                 <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 grid-rows-8 gap-2 md:gap-4 h-full max-w-4xl mx-auto timeline-grid">
                   {currentSalon.tables.map((table) => (
@@ -558,6 +878,7 @@ const Timeline: React.FC = () => {
             activeTab={activeDetailsTab}
             setActiveTab={setActiveDetailsTab}
             onUpdateReservation={handleUpdateReservation}
+            // Pasar generateTimeOptions si ReservationDetailsPanel la necesita para su date picker
           />
         )}
       </div>
@@ -574,6 +895,33 @@ const Timeline: React.FC = () => {
         onClose={() => setIsNuevaMesaModalOpen(false)}
         onAddTable={handleAddNewTable}
         salons={salonsData}
+      />
+
+      <BlockTableModal
+        isOpen={isBlockTableModalOpen}
+        onClose={() => setIsBlockTableModalOpen(false)}
+        onBlock={handleBlockTable}
+        tableId={selectedTableToBlock?.id || null}
+        currentSalonName={currentSalon?.name || 'Salón Desconocido'}
+        generateTimeOptions={generateTimeOptions}
+      />
+
+      {/* ¡NUEVO! Modal para Sentar Walk-in */}
+      <WalkInModal
+        isOpen={isWalkInModalOpen}
+        onClose={() => setIsWalkInModalOpen(false)}
+        onConfirmWalkIn={handleConfirmWalkIn}
+        tableId={selectedTable?.id || null}
+        tableCurrentSize={selectedTable?.size}
+      />
+
+      {/* ¡NUEVO! Modal para Cambiar de Mesa */}
+      <ChangeTableModal
+        isOpen={isChangeTableModalOpen}
+        onClose={() => setIsChangeTableModalOpen(false)}
+        onConfirmChange={handleChangeTableConfirm}
+        currentTableId={selectedTable?.id || null}
+        availableTables={getAvailableTablesForChange()}
       />
     </div>
   );
