@@ -4,9 +4,14 @@ import React, { useState, useEffect } from 'react';
 interface ClientTagsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveTags: (selectedTags: string[]) => void;
-  initialSelectedTags: string[]; // Tags que el cliente ya tiene
+  onSaveTags: (tags: string[]) => void;
+  initialSelectedTags: string[];
+  selectedTags?: string[];
+  onTagsUpdate?: (tags: string[]) => void;
 }
+
+
+
 
 // Definición de todos los tags disponibles, categorizados
 const ALL_CLIENT_TAGS = {

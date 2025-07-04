@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import NewWaitingEntryModal from '../components/NewWaitingEntryModal'; // Importa el nuevo modal
 
 const ListaEsperaPage: React.FC = () => {
-  const navigate = useNavigate();
+  
   const [isNewWaitingEntryModalOpen, setIsNewWaitingEntryModalOpen] = useState(false);
 
   // Define la interfaz para los datos de la lista de espera si aún no la tienes en un archivo compartido

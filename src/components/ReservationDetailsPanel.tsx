@@ -53,7 +53,8 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [newTag, setNewTag] = useState('');
-  const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
+  const [, setIsTagsModalOpen] = useState(false);
+  const [, setIsClientTagsModalOpen] = useState(false);
 
   const [clientProfile, setClientProfile] = useState<ClientProfile>({
     firstName: table?.reservationInfo?.guestName.split(' ')[0] || '',
@@ -117,7 +118,10 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
     }));
   };
 
-
+  const handleClose = () => {
+  setIsClientTagsModalOpen(false);
+  };
+  
   const getTagColor = (tag: string): string => {
     const tagCategories = [
       {
@@ -854,11 +858,14 @@ const ReservationDetailsPanel: React.FC<ReservationDetailsPanelProps> = ({
       />
 
       <ClientTagsModal
-        isOpen={isTagsModalOpen}
-        onClose={() => setIsTagsModalOpen(false)}
+        isOpen={isOpen}
+        onClose={handleClose}
         selectedTags={clientProfile.tags || []}
         onTagsUpdate={(tags) => handleProfileUpdate('tags', tags)}
+        onSaveTags={(tags) => console.log('Guardar tags', tags)}
+        initialSelectedTags={clientProfile.tags || []}
       />
+
     </div>
   );
 };

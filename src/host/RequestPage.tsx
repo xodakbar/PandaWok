@@ -22,7 +22,7 @@ interface RequestData {
 
 const RequestPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortOrder, setSortOrder] = useState('Reserva más cercana');
+  const [sortOrder, ] = useState('Reserva más cercana');
   const [showFilters, setShowFilters] = useState(false);
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false); // ¡Nuevo estado para el modal!
 

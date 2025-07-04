@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import React from 'react';
 import type { ReactNode } from 'react';
 import Login from './login/login';
 import RecoverPassword from './login/RecoverPassword';

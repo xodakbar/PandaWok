@@ -3,14 +3,14 @@ import React from 'react';
 
 // Si tus solicitudes de reserva tienen un tipo definido, lo pondrías aquí.
 // Por ejemplo:
-interface ReservationRequest {
-  id: string;
-  clientName: string;
-  date: string;
-  time: string;
-  guests: number;
-  // ... otras propiedades de la solicitud
-}
+// interface ReservationRequest {
+//   id: string;
+//   clientName: string;
+//   date: string;
+//   time: string;
+//   guests: number;
+// }
+
 
 interface RequestSidebarProps {
   isOpen: boolean;
