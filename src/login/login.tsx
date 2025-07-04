@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // useNavigate para redireccionar
 import logo from '../assets/wokpanda-white.png';
 
 const globalInputStyles = `
@@ -10,46 +10,104 @@ const globalInputStyles = `
   }
 `;
 
+interface User {
+  id: number;
+  nombre_usuario: string;
+  correo_electronico: string;
+  rol: string;
+}
+
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      console.log('Intentando iniciar sesión con:', { email, password });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      setError('Credenciales inválidas. Por favor intente nuevamente.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  const navigate = useNavigate();
 
   useEffect(() => {
     const styleEl = document.createElement('style');
     styleEl.innerHTML = globalInputStyles;
     document.head.appendChild(styleEl);
 
+    // Cargar user + token de localStorage si existe
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+      // Puedes redirigir automáticamente si quieres:
+      // navigate('/admin'); // o a la ruta que corresponda
+    }
+
     return () => {
       document.head.removeChild(styleEl);
     };
-  }, []);
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError(null);
+  setLoading(true);
+
+  try {
+    const res = await fetch('http://localhost:5000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        correo_electronico: email,
+        contrasena: password,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Error al iniciar sesión');
+    }
+
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+
+    setUser(data.user);
+    setError(null);
+    setLoading(false);
+
+    // Aquí rediriges a /timeline
+    navigate('/timeline');
+
+  } catch (error: any) {
+    setError(error.message || 'Credenciales inválidas. Por favor intente nuevamente.');
+    setLoading(false);
+  }
+};
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  if (user) {
+    // Si ya hay usuario logueado, muestra mensaje o redirige
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+        <h2 className="text-2xl font-semibold mb-4">¡Bienvenido, {user.nombre_usuario}!</h2>
+        <button
+          onClick={() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+          }}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#F7F7ED' }}>
-              <div className="flex-1 flex items-center justify-center p-3 sm:p-4">
+      <div className="flex-1 flex items-center justify-center p-3 sm:p-4">
         <div className="bg-white w-full max-w-md rounded-xl shadow-lg overflow-hidden mx-2 sm:mx-0">
           <div className="py-4 flex justify-center" style={{ backgroundColor: '#211B17' }}>
             <img src={logo} alt="PandaWok Logo" className="h-16 w-auto object-contain" />

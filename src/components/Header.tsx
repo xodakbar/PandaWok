@@ -8,9 +8,7 @@ import walkingIcon from '../assets/icons-header/walkin.png';
 import reserveIcon from '../assets/icons-header/reserve.png';
 import BlockSidebar from './BlockSidebar';
 import NewReservationModal from './NewReservationModal';
-// import WalkinModal from './WalkinModal'; // ¡Ya no se necesita un modal, sino una página!
 
-// Definiciones de tipos (mantenerlas)
 interface Salon {
   id: string;
   name: string;
@@ -38,11 +36,32 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
   const [isBlockSidebarOpen, setIsBlockSidebarOpen] = useState(false);
   const [isNewReservationModalOpen, setIsNewReservationModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // const [isWalkinModalOpen, setIsWalkinModalOpen] = useState(false); // ¡Eliminar este estado!
+  const [userName, setUserName] = useState(''); // Reintroducing userName state from the first snippet
 
   const navigate = useNavigate();
 
   const viewModes = ['Todo el día', 'Horario'];
+
+  // Reintroducing useEffect for userName from the first snippet
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        setUserName(user.nombre_usuario || '');
+      } catch (error) {
+        console.error("Error parsing user data from localStorage:", error);
+        setUserName('');
+      }
+    }
+  }, []);
+
+  // Reintroducing logout function from the first snippet
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
 
   const goToToday = () => {
     setCurrentDate(new Date());
@@ -78,7 +97,8 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (isMenuOpen && !target.closest('.menu-container')) {
+      // Ensure click outside menu closes it, but not if the click is on the menu button itself
+      if (isMenuOpen && !target.closest('.menu-container') && !target.closest('[aria-label="Toggle menu"]')) {
         setIsMenuOpen(false);
       }
     };
@@ -91,16 +111,20 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
 
   const handleBlockCreate = (blockData: BlockData) => {
     console.log('Nuevo bloqueo creado:', blockData);
-    // ... lógica para enviar a backend ...
+    // ... logic to send to backend ...
   };
 
   const handleGoToRequests = () => {
     navigate('/solicitudes');
   };
 
-  // ¡Nueva función para navegar a la página de Walk-in!
   const handleGoToWalkinPage = () => {
-    navigate('/lista-espera'); // Redirige a la nueva página
+    navigate('/lista-espera');
+  };
+
+  const handleGoToUsersPage = () => {
+    navigate('/admin/usuarios');
+    setIsMenuOpen(false); // Close menu after navigating
   };
 
   return (
@@ -127,15 +151,29 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
             <Link
               to="/timeline"
               className="block px-4 py-2 text-white hover:bg-orange-500/20 transition-colors text-sm border-b border-[#F7F7ED]"
+              onClick={() => setIsMenuOpen(false)}
             >
               Planos de mesa
             </Link>
             <Link
               to="/clientes"
-              className="block px-4 py-2 text-white hover:bg-orange-500/20 transition-colors text-sm"
+              className="block px-4 py-2 text-white hover:bg-orange-500/20 transition-colors text-sm border-b border-[#F7F7ED]"
+              onClick={() => setIsMenuOpen(false)}
             >
               Clientes
             </Link>
+            <button
+              onClick={handleGoToUsersPage}
+              className="w-full text-left px-4 py-2 text-white hover:bg-orange-500/20 transition-colors text-sm"
+            >
+              Usuarios
+            </button>
+            {/* Added a separator and user info/logout from the first snippet */}
+            <div className="border-t border-[#F7F7ED] my-1" />
+            <div className="px-4 py-2 text-white text-sm">
+              {userName && <p className="mb-2">Hola, <span className="font-semibold">{userName}</span></p>}
+              <button onClick={logout} className="text-red-400 hover:text-red-200 text-sm">Cerrar sesión</button>
+            </div>
           </div>
         )}
 
@@ -148,6 +186,8 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
         </div>
 
         {/* Íconos de acción para móvil */}
+        {/* The first code didn't have these explicitly structured for mobile,
+            but the second one did, so I'm keeping this structure. */}
         <div className="flex md:hidden space-x-2 header-icons-container">
           <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
@@ -165,7 +205,7 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
           </button>
           <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
-            onClick={handleGoToWalkinPage} // ¡Ahora redirige a la página!
+            onClick={handleGoToWalkinPage}
             aria-label="Walk-in"
           >
             <img src={walkingIcon} alt="Walk-in" className="header-icon-mobile" style={{ width: '28px', height: '28px' }} />
@@ -179,6 +219,15 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
           </button>
         </div>
       </div>
+
+      {/* Mostrar nombre del usuario en la parte derecha del header (Desktop Only) */}
+      {/* This was present in the first snippet but removed in the second. Reintroducing it as it's useful. */}
+      {userName && (
+        <div className="hidden md:flex items-center space-x-2 text-white text-sm font-medium ml-auto mr-4">
+          <span>Hola,</span>
+          <span className="font-semibold">{userName}</span>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-center space-x-2 md:space-x-6 flex-1 mt-3 md:mt-0 w-full md:w-auto">
         <div className="relative">
@@ -231,6 +280,7 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
       </div>
 
       {/* Íconos de acción para desktop */}
+      {/* These were explicitly added and styled in the second snippet. */}
       <div className="hidden md:flex items-center space-x-3 md:space-x-6 w-48 justify-end">
         <div className="relative group">
           <button
@@ -259,7 +309,7 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
         <div className="relative group">
           <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
-            onClick={handleGoToWalkinPage} // ¡Ahora redirige a la página!
+            onClick={handleGoToWalkinPage}
             aria-label="Walk-in"
           >
             <img src={walkingIcon} alt="Walk-in" style={{ width: '28px', height: '28px' }} />

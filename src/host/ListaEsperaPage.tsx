@@ -1,7 +1,7 @@
-// src/pages/ListaEsperaPage.tsx
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NewWaitingEntryModal from '../components/NewWaitingEntryModal.tsx'; // Importa el nuevo modal
+import NewWaitingEntryModal from '../components/NewWaitingEntryModal'; // Importa el nuevo modal
 
 const ListaEsperaPage: React.FC = () => {
   const navigate = useNavigate();
