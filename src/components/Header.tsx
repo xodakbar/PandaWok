@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
 import logo from '../assets/wokpanda-white.png';
 import lockIcon from '../assets/icons-header/lock.png';
 import requestIcon from '../assets/icons-header/request.png';
@@ -6,11 +8,23 @@ import walkingIcon from '../assets/icons-header/walkin.png';
 import reserveIcon from '../assets/icons-header/reserve.png';
 import BlockSidebar from './BlockSidebar';
 import NewReservationModal from './NewReservationModal';
+// import WalkinModal from './WalkinModal'; // ¡Ya no se necesita un modal, sino una página!
 
+// Definiciones de tipos (mantenerlas)
 interface Salon {
   id: string;
   name: string;
   tables: any[];
+}
+
+interface BlockData {
+  date: string;
+  allDay: boolean;
+  timeFrom: string | null;
+  timeTo: string | null;
+  area: string;
+  applyTo: 'all' | 'min_persons' | 'max_persons';
+  personsCount: number | null;
 }
 
 interface HeaderProps {
@@ -24,6 +38,9 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
   const [isBlockSidebarOpen, setIsBlockSidebarOpen] = useState(false);
   const [isNewReservationModalOpen, setIsNewReservationModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // const [isWalkinModalOpen, setIsWalkinModalOpen] = useState(false); // ¡Eliminar este estado!
+
+  const navigate = useNavigate();
 
   const viewModes = ['Todo el día', 'Horario'];
 
@@ -58,7 +75,7 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
     setIsDropdownOpen(false);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (isMenuOpen && !target.closest('.menu-container')) {
@@ -72,13 +89,27 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
     };
   }, [isMenuOpen]);
 
-  return (
+  const handleBlockCreate = (blockData: BlockData) => {
+    console.log('Nuevo bloqueo creado:', blockData);
+    // ... lógica para enviar a backend ...
+  };
 
+  const handleGoToRequests = () => {
+    navigate('/solicitudes');
+  };
+
+  // ¡Nueva función para navegar a la página de Walk-in!
+  const handleGoToWalkinPage = () => {
+    navigate('/lista-espera'); // Redirige a la nueva página
+  };
+
+  return (
     <div className="flex flex-col md:flex-row items-center justify-between p-2 md:p-4" style={{ backgroundColor: '#3C2022' }}>
       <div className="flex items-center space-x-2 md:space-x-4 w-full justify-between md:justify-start md:w-auto relative menu-container">
-        <button 
-          className="p-2 md:block" 
+        <button
+          className="p-2 md:block"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
+          aria-label="Toggle menu"
         >
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -86,25 +117,25 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
         </button>
 
         {isMenuOpen && (
-          <div 
-            className="absolute top-full left-0 mt-1 w-48 rounded-md shadow-lg z-50" 
-            style={{ 
+          <div
+            className="absolute top-full left-0 mt-1 w-48 rounded-md shadow-lg z-50"
+            style={{
               backgroundColor: '#3C2022',
               border: '1px solid #F7F7ED'
             }}
           >
-            <a 
-              href="/timeline" 
+            <Link
+              to="/timeline"
               className="block px-4 py-2 text-white hover:bg-orange-500/20 transition-colors text-sm border-b border-[#F7F7ED]"
             >
               Planos de mesa
-            </a>
-            <a 
-              href="/clientes" 
+            </Link>
+            <Link
+              to="/clientes"
               className="block px-4 py-2 text-white hover:bg-orange-500/20 transition-colors text-sm"
             >
               Clientes
-            </a>
+            </Link>
           </div>
         )}
 
@@ -115,37 +146,47 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
             className="h-10 md:h-16 w-auto"
           />
         </div>
+
+        {/* Íconos de acción para móvil */}
         <div className="flex md:hidden space-x-2 header-icons-container">
-          <button 
+          <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
             onClick={() => setIsBlockSidebarOpen(true)}
+            aria-label="Bloqueos"
           >
-            <img src={lockIcon} alt="Bloqueos" className="header-icon-mobile" style={{width: '28px', height: '28px'}} />
+            <img src={lockIcon} alt="Bloqueos" className="header-icon-mobile" style={{ width: '28px', height: '28px' }} />
           </button>
-          <button 
+          <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
+            onClick={handleGoToRequests}
+            aria-label="Solicitudes de reserva"
           >
-            <img src={requestIcon} alt="Solicitudes de reserva" style={{width: '28px', height: '28px'}} />
+            <img src={requestIcon} alt="Solicitudes de reserva" style={{ width: '28px', height: '28px' }} />
           </button>
-          <button 
+          <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
+            onClick={handleGoToWalkinPage} // ¡Ahora redirige a la página!
+            aria-label="Walk-in"
           >
-            <img src={walkingIcon} alt="Walk-in" className="header-icon-mobile" style={{width: '28px', height: '28px'}} />
+            <img src={walkingIcon} alt="Walk-in" className="header-icon-mobile" style={{ width: '28px', height: '28px' }} />
           </button>
-          <button 
+          <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
             onClick={() => setIsNewReservationModalOpen(true)}
+            aria-label="Nueva reserva"
           >
-            <img src={reserveIcon} alt="Nueva reserva" className="header-icon-mobile" style={{width: '28px', height: '28px'}} />
+            <img src={reserveIcon} alt="Nueva reserva" className="header-icon-mobile" style={{ width: '28px', height: '28px' }} />
           </button>
         </div>
       </div>
 
-              <div className="flex flex-wrap items-center justify-center space-x-2 md:space-x-6 flex-1 mt-3 md:mt-0 w-full md:w-auto">
+      <div className="flex flex-wrap items-center justify-center space-x-2 md:space-x-6 flex-1 mt-3 md:mt-0 w-full md:w-auto">
         <div className="relative">
           <button
             onClick={toggleDropdown}
             className="flex items-center space-x-1 md:space-x-2 text-white hover:bg-white/10 px-2 md:px-3 py-1 md:py-2 rounded transition-colors text-sm md:text-base"
+            aria-expanded={isDropdownOpen}
+            aria-haspopup="true"
           >
             <span>{viewMode}</span>
             <svg className={`w-3 h-3 md:w-4 md:h-4 text-white transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,13 +216,13 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
           Ir a hoy
         </button>
         <div className="flex items-center space-x-1 md:space-x-2">
-          <button onClick={goToPreviousDay} className="hover:bg-white/10 p-1 rounded transition-colors">
+          <button onClick={goToPreviousDay} className="hover:bg-white/10 p-1 rounded transition-colors" aria-label="Día anterior">
             <svg className="w-4 h-4 md:w-5 md:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <span className="text-white text-xs md:text-base min-w-[80px] md:min-w-[100px] text-center">{formatDate(currentDate)}</span>
-          <button onClick={goToNextDay} className="hover:bg-white/10 p-1 rounded transition-colors">
+          <button onClick={goToNextDay} className="hover:bg-white/10 p-1 rounded transition-colors" aria-label="Día siguiente">
             <svg className="w-4 h-4 md:w-5 md:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -189,40 +230,51 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
         </div>
       </div>
 
-              <div className="hidden md:flex items-center space-x-3 md:space-x-6 w-48 justify-end">
+      {/* Íconos de acción para desktop */}
+      <div className="hidden md:flex items-center space-x-3 md:space-x-6 w-48 justify-end">
         <div className="relative group">
           <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
             onClick={() => setIsBlockSidebarOpen(true)}
+            aria-label="Bloqueos"
           >
-            <img src={lockIcon} alt="Bloqueos" style={{width: '28px', height: '28px'}} />
+            <img src={lockIcon} alt="Bloqueos" style={{ width: '28px', height: '28px' }} />
           </button>
           <div className="absolute -bottom-8 right-0 w-24 bg-white text-gray-800 text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1 px-2 text-center">
             Bloqueos
           </div>
         </div>
         <div className="relative group">
-          <button className="p-1 hover:bg-white/10 rounded-full transition-colors">
-            <img src={requestIcon} alt="Solicitudes de reserva" className="header-icon-mobile" style={{width: '28px', height: '28px'}} />
+          <button
+            className="p-1 hover:bg-white/10 rounded-full transition-colors"
+            onClick={handleGoToRequests}
+            aria-label="Solicitudes de reserva"
+          >
+            <img src={requestIcon} alt="Solicitudes de reserva" className="header-icon-mobile" style={{ width: '28px', height: '28px' }} />
           </button>
           <div className="absolute -bottom-8 right-0 w-36 bg-white text-gray-800 text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1 px-2 text-center">
             Solicitudes de reserva
           </div>
         </div>
         <div className="relative group">
-          <button className="p-1 hover:bg-white/10 rounded-full transition-colors">
-            <img src={walkingIcon} alt="Walk-in" style={{width: '28px', height: '28px'}} />
+          <button
+            className="p-1 hover:bg-white/10 rounded-full transition-colors"
+            onClick={handleGoToWalkinPage} // ¡Ahora redirige a la página!
+            aria-label="Walk-in"
+          >
+            <img src={walkingIcon} alt="Walk-in" style={{ width: '28px', height: '28px' }} />
           </button>
           <div className="absolute -bottom-8 right-0 w-24 bg-white text-gray-800 text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1 px-2 text-center">
             Walk-in
           </div>
         </div>
         <div className="relative group">
-          <button 
+          <button
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
             onClick={() => setIsNewReservationModalOpen(true)}
+            aria-label="Nueva reserva"
           >
-            <img src={reserveIcon} alt="Nueva reserva" style={{width: '28px', height: '28px'}} />
+            <img src={reserveIcon} alt="Nueva reserva" style={{ width: '28px', height: '28px' }} />
           </button>
           <div className="absolute -bottom-8 right-0 w-28 bg-white text-gray-800 text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1 px-2 text-center">
             Nueva reserva
@@ -230,6 +282,7 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
         </div>
       </div>
 
+      {/* Modales y Sidebars */}
       <NewReservationModal
         isOpen={isNewReservationModalOpen}
         onClose={() => setIsNewReservationModalOpen(false)}
@@ -243,6 +296,7 @@ const Header: React.FC<HeaderProps> = ({ salones = [] }) => {
         isOpen={isBlockSidebarOpen}
         onClose={() => setIsBlockSidebarOpen(false)}
         salones={salones}
+        onBlockCreate={handleBlockCreate}
       />
     </div>
   );

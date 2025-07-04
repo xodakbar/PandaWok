@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Header from '../components/Header';
 import NewReservationModal from '../components/NewReservationModal';
 import ReservationDetailsPanel from '../components/ReservationDetailsPanel';
 import NuevaMesaModal from './NuevaMesaModal';
@@ -581,7 +580,6 @@ const Timeline: React.FC = () => {
 
   return (
     <div className="h-screen bg-slate-800 text-white flex flex-col">
-      <Header salones={salonsData} />
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
         <button

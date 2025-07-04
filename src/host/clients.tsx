@@ -1,18 +1,28 @@
-// src/host/clients.tsx
 import React, { useState } from 'react';
-import Header from '../components/Header';
+// ELIMINADA: import Header from '../components/Header'; // ¡Esta línea debe ser eliminada!
 import NewClientModal from '../components/NewClienteModal';
-import FilterClientsModal, { type ClientFilters } from '../components/FilterClientsModal'; // Importa la interfaz ClientFilters
-import type { Client } from '../types'; // Importa el tipo Client desde src/types/index.ts
+import TagsModal from '../components/TagsModal';
+import type { Client } from '../types';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
+// Definimos ClientFilters aquí, ya que FilterClientsModal fue removido.
+// Podrías mover esta interfaz a 'types.ts' si la usas en múltiples lugares.
+export interface ClientFilters {
+  minVisits?: number;
+  maxVisits?: number;
+  minTotalSpent?: number;
+  maxTotalSpent?: number;
+  selectedTags: string[];
+}
+
 const Clients: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState(''); // Lo que se escribe en el input
-  const [appliedSearchTerm, setAppliedSearchTerm] = useState(''); // Lo que se usa para filtrar después de "Aplicar Búsqueda"
+  const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false); // Estado para controlar el modal de filtros avanzados
-  const [currentAppliedFilters, setCurrentAppliedFilters] = useState<ClientFilters>({ // Estado para los filtros aplicados del modal
+  const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
+
+  const [currentAppliedFilters, setCurrentAppliedFilters] = useState<ClientFilters>({
     minVisits: undefined,
     maxVisits: undefined,
     minTotalSpent: undefined,
@@ -80,13 +90,18 @@ const Clients: React.FC = () => {
     setIsNewClientModalOpen(false);
   };
 
-  // Función para manejar la aplicación de filtros desde el modal de filtros avanzados
-  const handleApplyAdvancedFilters = (filters: ClientFilters) => {
-    setCurrentAppliedFilters(filters);
-    setIsFilterModalOpen(false); // Cierra el modal después de aplicar
+  const handleApplyTagsFromModal = (tags: string[]) => {
+    setCurrentAppliedFilters(prevFilters => ({
+      ...prevFilters,
+      selectedTags: tags,
+      minVisits: undefined,
+      maxVisits: undefined,
+      minTotalSpent: undefined,
+      maxTotalSpent: undefined,
+    }));
+    setIsTagsModalOpen(false);
   };
 
-  // Función para aplicar el término de búsqueda de la barra al presionar el botón
   const handleApplySearchTerm = () => {
     setAppliedSearchTerm(searchTerm);
   };
@@ -95,9 +110,10 @@ const Clients: React.FC = () => {
     const lowerCaseAppliedSearchTerm = appliedSearchTerm.toLowerCase();
     const isNumberSearch = !isNaN(Number(appliedSearchTerm)) && appliedSearchTerm.trim() !== '';
 
-    // Filtro por la BARRA DE BÚSQUEDA (aplicado al presionar "Aplicar Búsqueda" o Enter)
     let matchesSearchTerm = false;
-    if (isNumberSearch) {
+    if (appliedSearchTerm === '') {
+      matchesSearchTerm = true;
+    } else if (isNumberSearch) {
       matchesSearchTerm = client.visits === Number(appliedSearchTerm);
     } else {
       matchesSearchTerm = (
@@ -108,20 +124,12 @@ const Clients: React.FC = () => {
       );
     }
 
-    // Filtro por el MODAL DE FILTROS AVANZADOS (min/max visitas, min/max gasto, tags)
-    const matchesModalFilters =
-      (!currentAppliedFilters.minVisits || client.visits >= currentAppliedFilters.minVisits) &&
-      (!currentAppliedFilters.maxVisits || client.visits <= currentAppliedFilters.maxVisits) &&
-      (!currentAppliedFilters.minTotalSpent || client.totalSpent >= currentAppliedFilters.minTotalSpent) &&
-      (!currentAppliedFilters.maxTotalSpent || client.totalSpent <= currentAppliedFilters.maxTotalSpent) &&
-      // Filtro de tags del modal (si hay tags seleccionados, el cliente debe tener al menos uno)
-      (currentAppliedFilters.selectedTags.length === 0 ||
-        currentAppliedFilters.selectedTags.some(tag => client.tags.includes(tag)));
+    const matchesTags =
+      currentAppliedFilters.selectedTags.length === 0 ||
+      currentAppliedFilters.selectedTags.some(tag => client.tags.includes(tag));
 
-    // El cliente debe coincidir con AMBOS criterios de filtrado
-    return matchesSearchTerm && matchesModalFilters;
+    return matchesSearchTerm && matchesTags;
   });
-
 
   const handleDownloadClientsXLSX = () => {
     const dataForSheet = clients.map(client => ({
@@ -153,9 +161,15 @@ const Clients: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F7ED]">
-      <Header />
-      <div className="p-2 sm:p-4">
+    // Contenedor principal de la página de Clientes.
+    // Este div gestiona el layout interno de la página de Clientes.
+    // Asumimos que el Header global de la aplicación ya lo envuelve.
+    <div className="flex flex-col flex-1 bg-[#F7F7ED] h-full"> {/* Usamos flex-1 y h-full para que ocupe el espacio disponible del layout superior */}
+      
+      {/* Header específico de la página de Clientes */}
+      {/* Este div es sticky y se fija justo debajo del Header global. */}
+      {/* Ajusta 'top-[64px]' si la altura de tu Header global es diferente. */}
+      <div className="bg-[#F7F7ED] p-2 sm:p-4 pb-0 z-10 sticky top-[64px]">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 gap-4">
           <h1 className="text-xl sm:text-2xl font-semibold text-[#211B17]">Clientes</h1>
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
@@ -163,17 +177,20 @@ const Clients: React.FC = () => {
               type="text"
               placeholder="Buscar"
               className="px-3 sm:px-4 py-2 rounded-md bg-white border border-[#F2994A] text-[#211B17] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 w-full sm:w-64"
-              value={searchTerm} // El input controla searchTerm (lo que se ve en la caja)
+              value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => { // Permite aplicar búsqueda con Enter
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleApplySearchTerm();
                 }
               }}
             />
             <div className="flex flex-wrap gap-2">
-              {/* BOTÓN ORIGINAL DE TAGS */}
-              <button className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm">
+              {/* Botón Tags */}
+              <button
+                onClick={() => setIsTagsModalOpen(true)}
+                className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm"
+              >
                 <span className="flex items-center gap-1 sm:gap-2">
                   <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -182,20 +199,7 @@ const Clients: React.FC = () => {
                 </span>
               </button>
 
-              {/* BOTÓN PARA ABRIR EL MODAL DE FILTROS AVANZADOS */}
-              <button
-                onClick={() => setIsFilterModalOpen(true)}
-                className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm"
-              >
-                <span className="flex items-center gap-1 sm:gap-2">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                  </svg>
-                  <span className="hidden sm:inline">Filtros Avanzados</span>
-                </span>
-              </button>
-
-              {/* BOTÓN PARA APLICAR LA BÚSQUEDA DEL INPUT */}
+              {/* Botón Aplicar Búsqueda */}
               <button
                 onClick={handleApplySearchTerm}
                 className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm"
@@ -208,7 +212,7 @@ const Clients: React.FC = () => {
                 </span>
               </button>
 
-              {/* BOTÓN DE DESCARGAR */}
+              {/* Botón Descargar */}
               <button
                 onClick={handleDownloadClientsXLSX}
                 className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm"
@@ -221,7 +225,7 @@ const Clients: React.FC = () => {
                 </span>
               </button>
 
-              {/* BOTÓN DE NUEVO CLIENTE */}
+              {/* Botón Nuevo Cliente */}
               <button
                 onClick={handleOpenNewClientModal}
                 className="px-3 sm:px-4 py-2 bg-[#F2994A] text-white rounded-md hover:bg-[#d97d23] transition-colors font-semibold shadow text-sm"
@@ -232,7 +236,39 @@ const Clients: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-[#211B17] rounded-lg shadow">
+        {/* Mostrar tags aplicadas como pildoras */}
+        {currentAppliedFilters.selectedTags.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-[#211B17] font-semibold">Tags Aplicadas:</span>
+            {currentAppliedFilters.selectedTags.map(tag => (
+              <span key={tag} className="inline-flex items-center px-3 py-1 rounded-full bg-[#F2994A] text-white text-sm font-medium">
+                {tag}
+                <button
+                  onClick={() => handleApplyTagsFromModal(currentAppliedFilters.selectedTags.filter(t => t !== tag))}
+                  className="ml-2 -mr-1 text-white hover:text-gray-100 focus:outline-none"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+            <button
+              onClick={() => handleApplyTagsFromModal([])}
+              className="ml-2 text-[#F2994A] hover:underline text-sm"
+            >
+              Limpiar Todas
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Área de la tabla de clientes - ESTA ES LA ÚNICA QUE DEBE TENER SCROLL VERTICAL */}
+      {/* flex-1 asegura que este div ocupe el resto del espacio vertical disponible */}
+      {/* overflow-y-auto permite el scroll vertical si el contenido excede la altura */}
+      <div className="flex-1 overflow-y-auto px-2 sm:px-4 pb-4"
+           style={{ scrollbarWidth: 'thin', scrollbarColor: '#B24E00 #F7F7ED' }}>
+        <div className="bg-[#211B17] rounded-lg shadow">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-[#F7F7ED]/20">
@@ -279,19 +315,18 @@ const Clients: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal para crear un nuevo cliente */}
+      {/* Modales fuera del flujo principal de scroll */}
       <NewClientModal
         isOpen={isNewClientModalOpen}
         onClose={() => setIsNewClientModalOpen(false)}
         onClientCreated={handleClientCreated}
       />
 
-      {/* Modal para filtros avanzados */}
-      <FilterClientsModal
-        isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        onApplyFilters={handleApplyAdvancedFilters}
-        currentFilters={currentAppliedFilters}
+      <TagsModal
+        isOpen={isTagsModalOpen}
+        onClose={() => setIsTagsModalOpen(false)}
+        onApplyTags={handleApplyTagsFromModal}
+        currentSelectedTags={currentAppliedFilters.selectedTags}
       />
     </div>
   );

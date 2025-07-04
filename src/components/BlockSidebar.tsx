@@ -1,266 +1,236 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Salon {
   id: string;
   name: string;
-  tables: any[];
+  tables: any[]; // Asumiendo que 'tables' es un array de cualquier tipo
 }
 
 interface BlockSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  salones?: Salon[];
+  salones: Salon[];
+  onBlockCreate: (blockData: any) => void; // Función para manejar la creación del bloqueo
 }
 
-const BlockSidebar: React.FC<BlockSidebarProps> = ({ isOpen, onClose, salones = [] }) => {
-  const [selectedDate, setSelectedDate] = useState<string>(formatDateForInput(new Date()));
-  const [isAllDay, setIsAllDay] = useState(false);
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
-  const [selectedArea, setSelectedArea] = useState('');
-  const [applyToType, setApplyToType] = useState('todas');
-  const [personasMinimas, setPersonasMinimas] = useState(4);
-  const [personasMaximas, setPersonasMaximas] = useState(8);
+const BlockSidebar: React.FC<BlockSidebarProps> = ({ isOpen, onClose, salones, onBlockCreate }) => {
+  const [blockDate, setBlockDate] = useState<Date>(new Date());
+  const [allDay, setAllDay] = useState<boolean>(true);
+  const [timeFrom, setTimeFrom] = useState<string>('');
+  const [timeTo, setTimeTo] = useState<string>('');
+  const [selectedArea, setSelectedArea] = useState<string>('Todas las Áreas');
+  const [applyTo, setApplyTo] = useState<'all' | 'min_persons' | 'max_persons'>('all');
+  const [personsCount, setPersonsCount] = useState<number>(0);
 
-  const isFormValid = () => {
-    if (!selectedDate) return false;
+  // Resetear el estado cuando se abre o cierra el sidebar para limpiar el formulario
+  useEffect(() => {
+    if (!isOpen) {
+      setBlockDate(new Date());
+      setAllDay(true);
+      setTimeFrom('');
+      setTimeTo('');
+      setSelectedArea('Todas las Áreas');
+      setApplyTo('all');
+      setPersonsCount(0);
+    }
+  }, [isOpen]);
 
-    if (!isAllDay && (!startTime || !endTime)) return false;
-
-    if (!selectedArea) return false;
-
-    if (applyToType === 'masPersonas' && (!personasMinimas || personasMinimas < 1)) return false;
-    if (applyToType === 'menosPersonas' && (!personasMaximas || personasMaximas < 1)) return false;
-
-    return true;
+  const formatDate = (date: Date) => {
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return `Hoy, ${date.getDate()} ${months[date.getMonth()]}`;
+    }
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
   };
 
-  function formatDateForInput(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log({
-      date: selectedDate,
-      isAllDay,
-      startTime: isAllDay ? null : startTime,
-      endTime: isAllDay ? null : endTime,
+  const handleCreateBlock = () => {
+    const blockData = {
+      date: blockDate.toISOString().split('T')[0], // Formato YYYY-MM-DD
+      allDay: allDay,
+      timeFrom: allDay ? null : timeFrom,
+      timeTo: allDay ? null : timeTo,
       area: selectedArea,
-      applyToType,
-      personasMinimas: applyToType === 'masPersonas' ? personasMinimas : null,
-      personasMaximas: applyToType === 'menosPersonas' ? personasMaximas : null,
-    });
-    onClose();
+      applyTo: applyTo,
+      personsCount: (applyTo !== 'all') ? personsCount : null,
+    };
+    onBlockCreate(blockData);
+    onClose(); // Cierra el sidebar después de crear el bloqueo
   };
 
   if (!isOpen) return null;
 
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end"
-      onClick={handleOverlayClick}
-      style={{ background: 'transparent' }}
-    >
-      <div className="inset-y-0 right-0 w-full sm:w-[380px] md:w-96 bg-white shadow-lg transform transition-transform duration-300 ease-in-out" onClick={e => e.stopPropagation()}>
-        <div className="p-4 sm:p-6 flex justify-between items-center border-b border-gray-200">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800">Crear nuevo bloqueo</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-          >
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
+      <div className="w-full md:w-96 bg-[#212133] h-full shadow-lg p-6 flex flex-col">
+        {/* Header del sidebar */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-white">Bloqueos</h2>
+          <button onClick={onClose} className="text-white hover:text-gray-300">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-auto h-full flex flex-col">
-          <div className="space-y-4 sm:space-y-6 flex-1">
-            <div>
-              <label htmlFor="block-date" className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha
-              </label>
+        {/* Crear nuevo bloqueo */}
+        <div className="mb-6">
+          <h3 className="text-lg text-white mb-4">Crear nuevo bloqueo</h3>
+
+          {/* Fecha */}
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-1">Fecha</label>
+            <div className="relative">
               <input
-                type="date"
-                id="block-date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-800"
+                type="text"
+                value={formatDate(blockDate)}
+                readOnly
+                className="w-full p-2 rounded bg-[#33334F] text-white cursor-pointer"
+                onClick={() => { /* Abre un date picker aquí */ }}
               />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label htmlFor="all-day" className="block text-sm font-medium text-gray-700">
-                Todo el día
-              </label>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  id="all-day"
-                  className="sr-only"
-                  checked={isAllDay}
-                  onChange={(e) => setIsAllDay(e.target.checked)}
-                />
-                <div className="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out flex items-center p-1 bg-gray-300 data-[checked=true]:bg-orange-500" data-checked={isAllDay}>
-                  <span className={`inline-block h-4 w-4 rounded-full bg-white transform transition-transform duration-200 ease-in-out ${isAllDay ? 'translate-x-5' : 'translate-x-0'}`}></span>
-                </div>
-              </label>
-            </div>
-
-            {!isAllDay && (
-              <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div>
-                  <label htmlFor="start-time" className="block text-sm font-medium text-gray-700 mb-1">
-                    Desde
-                  </label>
-                  <input
-                    type="time"
-                    id="start-time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-800"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="end-time" className="block text-sm font-medium text-gray-700 mb-1">
-                    Hasta
-                  </label>
-                  <input
-                    type="time"
-                    id="end-time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-800"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="area" className="block text-sm font-medium text-gray-700 mb-1">
-                Área
-              </label>
-              <select
-                id="area"
-                value={selectedArea}
-                onChange={(e) => setSelectedArea(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-800"
+              {/* Aquí iría un Date Picker para seleccionar la fecha */}
+              {/* Por simplicidad, no incluyo un DatePicker completo, pero es donde se integraría */}
+              <button
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                onClick={() => { /* Lógica para abrir DatePicker */ }}
               >
-                <option value="" disabled>
-                  Seleccionar área
-                </option>
-                {salones.length > 0 ? (
-                  salones.map((salon) => (
-                    <option key={salon.id} value={salon.id}>
-                      {salon.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>No hay salones disponibles</option>
-                )}
-              </select>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </button>
             </div>
+          </div>
 
-            <div>
-              <h3 className="block text-sm font-medium text-gray-700 mb-2">
-                Aplicar bloqueo a:
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <div onClick={() => setApplyToType('todas')} className="cursor-pointer flex items-center justify-center">
-                    <div className={`w-5 h-5 rounded-full border ${applyToType === 'todas' ? 'border-orange-500' : 'border-gray-400'} flex items-center justify-center`}>
-                      {applyToType === 'todas' && <div className="w-3 h-3 rounded-full bg-orange-500"></div>}
-                    </div>
-                  </div>
-                  <label htmlFor="todas" className="text-sm text-gray-700 cursor-pointer" onClick={() => setApplyToType('todas')}>
-                    Todas las reservas
-                  </label>
-                </div>
+          {/* Todo el día / Horario */}
+          <div className="flex items-center mb-4">
+            <label htmlFor="allDayToggle" className="mr-3 text-white text-sm">Todo el día</label>
+            <input
+              type="checkbox"
+              id="allDayToggle"
+              checked={allDay}
+              onChange={(e) => setAllDay(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div
+              className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 dark:peer-focus:ring-orange-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"
+              onClick={() => setAllDay(!allDay)} // Esto permite hacer clic en el div para cambiarlo
+            ></div>
+          </div>
 
-                <div className="flex items-center space-x-2">
-                  <div onClick={() => setApplyToType('masPersonas')} className="cursor-pointer flex items-center justify-center">
-                    <div className={`w-5 h-5 rounded-full border ${applyToType === 'masPersonas' ? 'border-orange-500' : 'border-gray-400'} flex items-center justify-center`}>
-                      {applyToType === 'masPersonas' && <div className="w-3 h-3 rounded-full bg-orange-500"></div>}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap sm:flex-nowrap items-center">
-                    <label htmlFor="masPersonas" className="text-sm text-gray-700" onClick={() => setApplyToType('masPersonas')}>
-                      Reservas de
-                    </label>
-                    <input 
-                      type="number" 
-                      className="mx-2 w-16 border border-gray-300 rounded-md px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-800" 
-                      value={personasMinimas}
-                      onChange={(e) => setPersonasMinimas(Number(e.target.value))}
-                      min="1"
-                      disabled={applyToType !== 'masPersonas'}
-                    />
-                    <span className="text-sm text-gray-700 w-full sm:w-auto mt-1 sm:mt-0 pl-7 sm:pl-0">o más personas</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <div onClick={() => setApplyToType('menosPersonas')} className="cursor-pointer flex items-center justify-center">
-                    <div className={`w-5 h-5 rounded-full border ${applyToType === 'menosPersonas' ? 'border-orange-500' : 'border-gray-400'} flex items-center justify-center`}>
-                      {applyToType === 'menosPersonas' && <div className="w-3 h-3 rounded-full bg-orange-500"></div>}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap sm:flex-nowrap items-center">
-                    <label htmlFor="menosPersonas" className="text-sm text-gray-700" onClick={() => setApplyToType('menosPersonas')}>
-                      Reservas de
-                    </label>
-                    <input 
-                      type="number" 
-                      className="mx-2 w-16 border border-gray-300 rounded-md px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-800" 
-                      value={personasMaximas}
-                      onChange={(e) => setPersonasMaximas(Number(e.target.value))}
-                      min="1"
-                      disabled={applyToType !== 'menosPersonas'}
-                    />
-                    <span className="text-sm text-gray-700 w-full sm:w-auto mt-1 sm:mt-0 pl-7 sm:pl-0">o menos personas</span>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={!isFormValid()}
-                  className={`mt-4 w-full ${isFormValid() ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-300 cursor-not-allowed'} text-white rounded-md py-2 px-4 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors`}
-                >
-                  Crear Bloqueo
-                </button>
+          {/* Desde / Hasta (condicional) */}
+          {!allDay && (
+            <div className="flex space-x-4 mb-4">
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">Desde</label>
+                <input
+                  type="time"
+                  value={timeFrom}
+                  onChange={(e) => setTimeFrom(e.target.value)}
+                  className="w-full p-2 rounded bg-[#33334F] text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">Hasta</label>
+                <input
+                  type="time"
+                  value={timeTo}
+                  onChange={(e) => setTimeTo(e.target.value)}
+                  className="w-full p-2 rounded bg-[#33334F] text-white"
+                />
               </div>
             </div>
+          )}
+
+          {/* Área */}
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-1">Área</label>
+            <select
+              value={selectedArea}
+              onChange={(e) => setSelectedArea(e.target.value)}
+              className="w-full p-2 rounded bg-[#33334F] text-white appearance-none"
+            >
+              <option value="Todas las Áreas">Todas las Áreas</option>
+              {salones.map((salon) => (
+                <option key={salon.id} value={salon.name}>
+                  {salon.name}
+                </option>
+              ))}
+            </select>
+            {/* Ícono de flecha para el select */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 6.757 7.586 5.343 9z"/></svg>
+            </div>
           </div>
 
-
-          <div className="mt-6 border-t border-gray-200 pt-4 flex space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-white border border-gray-300 text-gray-700 rounded-md py-2 px-4 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={!isFormValid()}
-              className={`flex-1 ${isFormValid() ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-300 cursor-not-allowed'} text-white rounded-md py-2 px-4 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors`}
-            >
-              Crear Bloqueo
-            </button>
+          {/* Aplicar a: */}
+          <div className="mb-6">
+            <label className="block text-gray-400 text-sm mb-2">Aplicar a :</label>
+            <div className="space-y-2">
+              <label className="flex items-center text-white text-sm">
+                <input
+                  type="radio"
+                  name="applyTo"
+                  value="all"
+                  checked={applyTo === 'all'}
+                  onChange={() => setApplyTo('all')}
+                  className="mr-2 text-orange-500 focus:ring-orange-500"
+                />
+                Todas las reservas
+              </label>
+              <label className="flex items-center text-white text-sm">
+                <input
+                  type="radio"
+                  name="applyTo"
+                  value="min_persons"
+                  checked={applyTo === 'min_persons'}
+                  onChange={() => setApplyTo('min_persons')}
+                  className="mr-2 text-orange-500 focus:ring-orange-500"
+                />
+                Reservas de
+                <input
+                  type="number"
+                  value={personsCount}
+                  onChange={(e) => setPersonsCount(parseInt(e.target.value) || 0)}
+                  disabled={applyTo !== 'min_persons'}
+                  className={`ml-2 w-16 p-1 rounded bg-[#33334F] text-white text-center ${applyTo !== 'min_persons' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                />
+                o más personas
+              </label>
+              <label className="flex items-center text-white text-sm">
+                <input
+                  type="radio"
+                  name="applyTo"
+                  value="max_persons"
+                  checked={applyTo === 'max_persons'}
+                  onChange={() => setApplyTo('max_persons')}
+                  className="mr-2 text-orange-500 focus:ring-orange-500"
+                />
+                Reservas de
+                <input
+                  type="number"
+                  value={personsCount}
+                  onChange={(e) => setPersonsCount(parseInt(e.target.value) || 0)}
+                  disabled={applyTo !== 'max_persons'}
+                  className={`ml-2 w-16 p-1 rounded bg-[#33334F] text-white text-center ${applyTo !== 'max_persons' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                />
+                o menos personas
+              </label>
+            </div>
           </div>
-        </form>
+
+          <button
+            onClick={handleCreateBlock}
+            className="w-full bg-orange-500 text-white py-2 rounded font-semibold hover:bg-orange-600 transition-colors"
+          >
+            Crear Bloqueo
+          </button>
+        </div>
+
+        {/* Bloqueos Creados para hoy */}
+        <div className="mt-auto text-center text-gray-400 text-sm">
+          Bloqueos Creados para hoy (0) {/* Aquí deberías mostrar el número real de bloqueos */}
+        </div>
       </div>
     </div>
   );
