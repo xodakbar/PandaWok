@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // useNavigate para redireccionar
+import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/wokpanda-white.png';
 
 const globalInputStyles = `
@@ -34,7 +34,8 @@ const Login: React.FC = () => {
 
     // Cargar user + token de localStorage si existe
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
+    const savedToken = localStorage.getItem('token');
+    if (savedUser && savedToken) {
       setUser(JSON.parse(savedUser));
       // Si quieres redirigir automáticamente al usuario logueado:
       // navigate('/timeline');
@@ -51,8 +52,7 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const API_BASE_URL =
-        process.env.REACT_APP_API_URL?.trim() || 'http://localhost:5000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL;
 
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
@@ -73,7 +73,6 @@ const Login: React.FC = () => {
       setError(null);
       setLoading(false);
 
-      // Redirige a la página timeline
       navigate('/timeline');
     } catch (error: any) {
       setError(error.message || 'Credenciales inválidas. Por favor intente nuevamente.');
@@ -159,7 +158,6 @@ const Login: React.FC = () => {
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
                   {showPassword ? (
-                    // Icono ojo abierto
                     <svg
                       className="w-5 h-5"
                       fill="none"
@@ -175,7 +173,6 @@ const Login: React.FC = () => {
                       />
                     </svg>
                   ) : (
-                    // Icono ojo cerrado
                     <svg
                       className="w-5 h-5"
                       fill="none"
