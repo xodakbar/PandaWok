@@ -51,7 +51,7 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const API_BASE_URL = 'https://pandawok-backend-production.up.railway.app';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
