@@ -36,8 +36,8 @@ const Login: React.FC = () => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
-      // Puedes redirigir automáticamente si quieres:
-      // navigate('/admin'); // o a la ruta que corresponda
+      // Si quieres redirigir automáticamente al usuario logueado:
+      // navigate('/timeline');
     }
 
     return () => {
@@ -51,7 +51,8 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const API_BASE_URL =
+        process.env.REACT_APP_API_URL?.trim() || 'http://localhost:5000';
 
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
@@ -85,7 +86,6 @@ const Login: React.FC = () => {
   };
 
   if (user) {
-    // Si ya hay usuario logueado, muestra mensaje o redirige
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
         <h2 className="text-2xl font-semibold mb-4">¡Bienvenido, {user.nombre_usuario}!</h2>
@@ -94,6 +94,7 @@ const Login: React.FC = () => {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             setUser(null);
+            navigate('/login');
           }}
           className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
         >
@@ -111,7 +112,7 @@ const Login: React.FC = () => {
             <img src={logo} alt="PandaWok Logo" className="h-16 w-auto object-contain" />
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -128,6 +129,7 @@ const Login: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
                 placeholder="ejemplo@pandawok.com"
                 style={{ WebkitAppearance: 'none' }}
@@ -145,6 +147,7 @@ const Login: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 pr-10 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
                   placeholder="Ingrese su contraseña"
                   style={{ WebkitAppearance: 'none' }}
@@ -153,13 +156,16 @@ const Login: React.FC = () => {
                   type="button"
                   onClick={togglePasswordVisibility}
                   className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
                   {showPassword ? (
+                    // Icono ojo abierto
                     <svg
                       className="w-5 h-5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -169,11 +175,13 @@ const Login: React.FC = () => {
                       />
                     </svg>
                   ) : (
+                    // Icono ojo cerrado
                     <svg
                       className="w-5 h-5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
