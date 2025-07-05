@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios'; // <-- import axios
 import logo from '../assets/wokpanda-white.png';
 
 const globalInputStyles = `
@@ -52,19 +53,22 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL;
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ correo_electronico: email, contrasena: password }),
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/api/auth/login`,
+        {
+          correo_electronico: email,
+          contrasena: password,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Error al iniciar sesión');
-      }
+      const data = response.data;
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -75,7 +79,13 @@ const Login: React.FC = () => {
 
       navigate('/timeline');
     } catch (error: any) {
-      setError(error.message || 'Credenciales inválidas. Por favor intente nuevamente.');
+      if (error.response) {
+        setError(error.response.data.message || 'Error al iniciar sesión');
+      } else if (error.request) {
+        setError('No se pudo conectar al servidor. Intente más tarde.');
+      } else {
+        setError(error.message || 'Error inesperado');
+      }
       setLoading(false);
     }
   };
