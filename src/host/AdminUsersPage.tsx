@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 
 interface User {
   id: number | string;
@@ -19,7 +20,6 @@ const AdminUsersPage: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // Campos para crear y editar
   const [formData, setFormData] = useState({
     nombre_usuario: '',
     apellido_usuario: '',
@@ -28,21 +28,18 @@ const AdminUsersPage: React.FC = () => {
     rol: 'anfitrion',
   });
 
-  // Carga usuarios al montar
   useEffect(() => {
     fetchUsers();
   }, []);
 
   async function fetchUsers() {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users`);
-      if (!res.ok) throw new Error('Error al cargar usuarios');
-      const data = await res.json();
-      setUsers(data);
-      setError(null);
+      const res = await axios.get<User[]>(`${API_BASE_URL}/api/users`);
+      setUsers(res.data);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message || 'Error al cargar usuarios');
     } finally {
       setLoading(false);
     }
@@ -63,7 +60,6 @@ const AdminUsersPage: React.FC = () => {
     setError(null);
   }
 
-  // Crear usuario
   async function handleCreateSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formData.nombre_usuario || !formData.apellido_usuario || !formData.correo_electronico || !formData.contrasena || !formData.rol) {
@@ -71,77 +67,58 @@ const AdminUsersPage: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Error al crear usuario');
-      setUsers([...users, data.user]);
+      const res = await axios.post(`${API_BASE_URL}/api/users`, formData);
+      setUsers([...users, res.data.user]);
       alert('Usuario creado');
       closeModals();
     } catch (err: any) {
-      alert(err.message);
+      alert(err.response?.data?.message || err.message || 'Error al crear usuario');
     }
   }
 
-  // Abrir modal edición
   function openEditModal(user: User) {
     setEditingUser(user);
     setFormData({
       nombre_usuario: user.nombre_usuario,
       apellido_usuario: user.apellido_usuario,
       correo_electronico: user.correo_electronico,
-      contrasena: '', // No se edita aquí
+      contrasena: '', // no se edita aquí
       rol: user.rol,
     });
     setShowEditModal(true);
   }
 
-  // Editar usuario
   async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editingUser) return;
-
     const { nombre_usuario, apellido_usuario, correo_electronico, rol } = formData;
     if (!nombre_usuario || !apellido_usuario || !correo_electronico || !rol) {
       alert('Completa todos los campos');
       return;
     }
-
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre_usuario, apellido_usuario, correo_electronico, rol }),
+      const res = await axios.put(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+        nombre_usuario,
+        apellido_usuario,
+        correo_electronico,
+        rol,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Error al actualizar usuario');
-
-      setUsers(users.map(u => (u.id === editingUser.id ? data.user : u)));
+      setUsers(users.map(u => (u.id === editingUser.id ? res.data.user : u)));
       alert('Usuario actualizado');
       closeModals();
     } catch (err: any) {
-      alert(err.message);
+      alert(err.response?.data?.message || err.message || 'Error al actualizar usuario');
     }
   }
 
-  // Eliminar usuario
   async function handleDelete(userId: number | string) {
     if (!confirm('¿Seguro quieres eliminar este usuario?')) return;
-
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Error al eliminar usuario');
-
+      await axios.delete(`${API_BASE_URL}/api/users/${userId}`);
       setUsers(users.filter(u => u.id !== userId));
       alert('Usuario eliminado');
     } catch (err: any) {
-      alert(err.message);
+      alert(err.response?.data?.message || err.message || 'Error al eliminar usuario');
     }
   }
 
