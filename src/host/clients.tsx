@@ -1,333 +1,542 @@
-import React, { useState } from 'react';
-// ELIMINADA: import Header from '../components/Header'; // ¡Esta línea debe ser eliminada!
-import NewClientModal from '../components/NewClienteModal';
-import TagsModal from '../components/TagsModal';
-import type { Client } from '../types';
+// src/pages/Clients.tsx
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import TagsModal from '../components/TagsModal';
+import { FaTrashAlt, FaPencilAlt } from 'react-icons/fa';
 
-// Definimos ClientFilters aquí, ya que FilterClientsModal fue removido.
-// Podrías mover esta interfaz a 'types.ts' si la usas en múltiples lugares.
-export interface ClientFilters {
-  minVisits?: number;
-  maxVisits?: number;
-  minTotalSpent?: number;
-  maxTotalSpent?: number;
-  selectedTags: string[];
+export interface Client {
+  id: string;
+  nombre: string;
+  apellido: string;
+  correo_electronico: string;
+  telefono: string;
+  visitas: number;
+  ultima_visita: string | null;
+  tags: string[];
+  gasto_total: number;
+  gasto_por_visita: number;
+  notas: string;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// Colores adaptados a tonos cafés:
+const TAG_COLOR_MAP: Record<string, string> = {
+  'Área de Fumadores': 'bg-yellow-700',
+  'Área del Bar': 'bg-yellow-700',
+  Booth: 'bg-yellow-700',
+  Esquina: 'bg-yellow-700',
+  Fumador: 'bg-yellow-700',
+  Interior: 'bg-yellow-700',
+  'Mesa con Vista': 'bg-yellow-700',
+  'Mesa Tranquila': 'bg-yellow-700',
+  'Salón Principal': 'bg-yellow-700',
+  Terraza: 'bg-yellow-700',
+  Ventana: 'bg-yellow-700',
+
+  Alergia: 'bg-green-700',
+  Huevos: 'bg-green-700',
+  'Libre de Gluten': 'bg-green-700',
+  'Libre de Lactosa': 'bg-green-700',
+  Mariscos: 'bg-green-700',
+  'Sin Maní': 'bg-green-700',
+  Vegano: 'bg-green-700',
+  Vegetariano: 'bg-green-700',
+
+  'Alto Consumo': 'bg-orange-700',
+  VIP: 'bg-orange-700',
+
+  'Cliente frecuente': 'bg-gray-500',
+};
+
+const getTagColor = (tag: string) => TAG_COLOR_MAP[tag] || 'bg-gray-400';
+
 const Clients: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
-  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
-  const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
 
-  const [currentAppliedFilters, setCurrentAppliedFilters] = useState<ClientFilters>({
-    minVisits: undefined,
-    maxVisits: undefined,
-    minTotalSpent: undefined,
-    maxTotalSpent: undefined,
-    selectedTags: [],
+  // Crear modal
+  const [showCreate, setShowCreate] = useState(false);
+  const [newData, setNewData] = useState<Partial<Client> & { tags: string[] }>({ tags: [] });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [showTagsCreate, setShowTagsCreate] = useState(false);
+
+  // Editar modal
+  const [showEdit, setShowEdit] = useState(false);
+  const [editData, setEditData] = useState<Partial<Client> & { tags: string[] }>({ tags: [] });
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [showTagsEdit, setShowTagsEdit] = useState(false);
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  async function fetchClients() {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await axios.get<{ success: boolean; data: any[] }>(`${API_BASE_URL}/api/clients`);
+      const mapped: Client[] = data.data.map((c) => ({
+        id: String(c.id),
+        nombre: c.nombre,
+        apellido: c.apellido,
+        correo_electronico: c.correo_electronico,
+        telefono: c.telefono,
+        visitas: Number(c.visitas) || 0,
+        ultima_visita: c.ultima_visita ?? null,
+        tags: Array.isArray(c.tags) ? c.tags : [],
+        gasto_total: Number(c.gasto_total) || 0,
+        gasto_por_visita: Number(c.gasto_por_visita) || 0,
+        notas: c.notas || '',
+      }));
+      setClients(mapped);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = clients.filter((c) => {
+    if (!appliedSearch) return true;
+    const t = appliedSearch.toLowerCase();
+    return (
+      (`${c.nombre} ${c.apellido}`).toLowerCase().includes(t) ||
+      c.telefono.toLowerCase().includes(t) ||
+      c.correo_electronico.toLowerCase().includes(t) ||
+      c.tags.some((tg) => tg.toLowerCase().includes(t))
+    );
   });
 
-  const [clients, setClients] = useState<Client[]>([
-    {
-      id: 'client-1',
-      name: 'Alejandro Garay',
-      phone: '+56 09 4507 8880',
-      email: 'aleleon_237@hotmail.com',
-      visits: 0,
-      lastVisit: '-',
-      tags: [],
-      totalSpent: 0.00,
-      spentPerVisit: 0.00,
-      profileNote: '-',
-    },
-    {
-      id: 'client-2',
-      name: 'Maria Perez',
-      phone: '+56 09 1234 5678',
-      email: 'maria.perez@example.com',
-      visits: 5,
-      lastVisit: '15/05/2025',
-      tags: ['VIP', 'Familia', 'Alto Consumo'],
-      totalSpent: 120.50,
-      spentPerVisit: 24.10,
-      profileNote: 'Siempre pide mesa junto a la ventana.'
-    },
-    {
-      id: 'client-3',
-      name: 'Juan Gomez',
-      phone: '+56 09 8765 4321',
-      email: 'juan.gomez@example.com',
-      visits: 1,
-      lastVisit: '01/07/2025',
-      tags: ['Vegano'],
-      totalSpent: 45.00,
-      spentPerVisit: 45.00,
-      profileNote: '-'
-    },
-    {
-      id: 'client-4',
-      name: 'Ana Ramirez',
-      phone: '+56 09 2345 6789',
-      email: 'ana.ramirez@example.com',
-      visits: 10,
-      lastVisit: '20/06/2025',
-      tags: ['Cliente Frecuente', 'Mesa Tranquila'],
-      totalSpent: 300.00,
-      spentPerVisit: 30.00,
-      profileNote: 'Le gusta el café descafeinado.'
-    }
-  ]);
+  function applyFilter() {
+    setAppliedSearch(search);
+  }
 
-  const handleOpenNewClientModal = () => {
-    setIsNewClientModalOpen(true);
-  };
-
-  const handleClientCreated = (newClient: Client) => {
-    setClients(prevClients => [...prevClients, newClient]);
-    setIsNewClientModalOpen(false);
-  };
-
-  const handleApplyTagsFromModal = (tags: string[]) => {
-    setCurrentAppliedFilters(prevFilters => ({
-      ...prevFilters,
-      selectedTags: tags,
-      minVisits: undefined,
-      maxVisits: undefined,
-      minTotalSpent: undefined,
-      maxTotalSpent: undefined,
-    }));
-    setIsTagsModalOpen(false);
-  };
-
-  const handleApplySearchTerm = () => {
-    setAppliedSearchTerm(searchTerm);
-  };
-
-  const filteredClients = clients.filter(client => {
-    const lowerCaseAppliedSearchTerm = appliedSearchTerm.toLowerCase();
-    const isNumberSearch = !isNaN(Number(appliedSearchTerm)) && appliedSearchTerm.trim() !== '';
-
-    let matchesSearchTerm = false;
-    if (appliedSearchTerm === '') {
-      matchesSearchTerm = true;
-    } else if (isNumberSearch) {
-      matchesSearchTerm = client.visits === Number(appliedSearchTerm);
-    } else {
-      matchesSearchTerm = (
-        client.name.toLowerCase().includes(lowerCaseAppliedSearchTerm) ||
-        client.email.toLowerCase().includes(lowerCaseAppliedSearchTerm) ||
-        client.phone.toLowerCase().includes(lowerCaseAppliedSearchTerm) ||
-        client.tags.some(tag => tag.toLowerCase().includes(lowerCaseAppliedSearchTerm))
-      );
-    }
-
-    const matchesTags =
-      currentAppliedFilters.selectedTags.length === 0 ||
-      currentAppliedFilters.selectedTags.some(tag => client.tags.includes(tag));
-
-    return matchesSearchTerm && matchesTags;
-  });
-
-  const handleDownloadClientsXLSX = () => {
-    const dataForSheet = clients.map(client => ({
-      ID: client.id,
-      Nombre: client.name,
-      Teléfono: client.phone,
-      'Correo Electrónico': client.email,
-      Visitas: client.visits,
-      'Última Visita': client.lastVisit,
-      'Tags del Cliente': client.tags.join(', '),
-      'Gasto Total': client.totalSpent,
-      'Gasto por Visita': client.spentPerVisit,
-      'Nota del Perfil': client.profileNote,
-    }));
-
+  function exportExcel() {
+    const ws = XLSX.utils.json_to_sheet(
+      clients.map((c) => ({
+        ID: c.id,
+        Nombre: `${c.nombre} ${c.apellido}`,
+        Teléfono: c.telefono,
+        Correo: c.correo_electronico,
+        Visitas: c.visitas,
+        'Última Visita': c.ultima_visita ?? '-',
+        Tags: c.tags.join(', '),
+        'Gasto Total (CLP)': c.gasto_total.toFixed(2),
+        'Gasto Promedio por Visita (CLP)': c.gasto_por_visita.toFixed(2),
+        Notas: c.notas,
+      }))
+    );
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(dataForSheet);
-    XLSX.utils.book_append_sheet(wb, ws, 'Clientes PandaWok');
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    saveAs(new Blob([buf]), `clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
 
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const year = today.getFullYear();
-    const dateString = `${day}-${month}-${year}`;
+  async function handleCreate() {
+    setCreateError(null);
+    if (!newData.nombre || !newData.apellido || !newData.correo_electronico) {
+      setCreateError('Nombre, apellido y correo son obligatorios');
+      return;
+    }
+    setCreating(true);
+    try {
+      const { data } = await axios.post<{ success: boolean; message?: string }>(
+        `${API_BASE_URL}/api/clients`,
+        newData
+      );
+      if (data.success) {
+        setShowCreate(false);
+        setNewData({ tags: [] });
+        fetchClients();
+      } else {
+        setCreateError(data.message || 'Error al crear');
+      }
+    } catch (err: any) {
+      setCreateError(err.response?.data?.message || err.message);
+    } finally {
+      setCreating(false);
+    }
+  }
 
-    const fileName = `clientes_pandawok_${dateString}.xlsx`;
-    saveAs(new Blob([wbout], { type: 'application/octet-stream' }), fileName);
-  };
+  function openEdit(c: Client) {
+    setEditData({ ...c });
+    setShowEdit(true);
+    setEditError(null);
+  }
+
+  // Calcula gasto_total automáticamente en base a visitas * gasto_por_visita
+  function handleEditField<K extends keyof Client>(field: K, value: Client[K]) {
+    let newEditData = { ...editData, [field]: value };
+
+    if (field === 'visitas' || field === 'gasto_por_visita') {
+      const visitas = Number(field === 'visitas' ? value : newEditData.visitas ?? 0);
+      const gastoPorVisita = Number(field === 'gasto_por_visita' ? value : newEditData.gasto_por_visita ?? 0);
+      newEditData.gasto_total = visitas * gastoPorVisita;
+    }
+
+    setEditData(newEditData);
+  }
+
+  async function handleEdit() {
+    if (!editData.id) return;
+    setEditing(true);
+    try {
+      const { data } = await axios.put<{ success: boolean; message?: string }>(
+        `${API_BASE_URL}/api/clients/${editData.id}`,
+        editData
+      );
+      if (data.success) {
+        setShowEdit(false);
+        fetchClients();
+      } else {
+        setEditError(data.message || 'Error al actualizar');
+      }
+    } catch (err: any) {
+      setEditError(err.response?.data?.message || err.message);
+    } finally {
+      setEditing(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar cliente?')) return;
+
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/api/clients/${id}`);
+
+      if (!(response.status >= 200 && response.status < 300)) {
+        throw new Error(`Error al eliminar cliente (status ${response.status})`);
+      }
+
+      fetchClients();
+    } catch (error: any) {
+      console.error('Error al eliminar cliente:', error);
+      alert(error.response?.data?.message || error.message || 'Error al eliminar cliente');
+    }
+  }
 
   return (
-    // Contenedor principal de la página de Clientes.
-    // Este div gestiona el layout interno de la página de Clientes.
-    // Asumimos que el Header global de la aplicación ya lo envuelve.
-    <div className="flex flex-col flex-1 bg-[#F7F7ED] h-full"> {/* Usamos flex-1 y h-full para que ocupe el espacio disponible del layout superior */}
-      
-      {/* Header específico de la página de Clientes */}
-      {/* Este div es sticky y se fija justo debajo del Header global. */}
-      {/* Ajusta 'top-[64px]' si la altura de tu Header global es diferente. */}
-      <div className="bg-[#F7F7ED] p-2 sm:p-4 pb-0 z-10 sticky top-[64px]">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#211B17]">Clientes</h1>
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-            <input
-              type="text"
-              placeholder="Buscar"
-              className="px-3 sm:px-4 py-2 rounded-md bg-white border border-[#F2994A] text-[#211B17] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 w-full sm:w-64"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleApplySearchTerm();
-                }
-              }}
-            />
-            <div className="flex flex-wrap gap-2">
-              {/* Botón Tags */}
-              <button
-                onClick={() => setIsTagsModalOpen(true)}
-                className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm"
-              >
-                <span className="flex items-center gap-1 sm:gap-2">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  <span className="hidden sm:inline">Tags</span>
-                </span>
-              </button>
-
-              {/* Botón Aplicar Búsqueda */}
-              <button
-                onClick={handleApplySearchTerm}
-                className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm"
-              >
-                <span className="flex items-center gap-1 sm:gap-2">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span className="hidden sm:inline">Aplicar Búsqueda</span>
-                </span>
-              </button>
-
-              {/* Botón Descargar */}
-              <button
-                onClick={handleDownloadClientsXLSX}
-                className="px-2 sm:px-3 py-2 rounded-md border border-[#F2994A] text-[#F2994A] bg-white hover:bg-[#F2994A] hover:text-white transition-colors text-sm"
-              >
-                <span className="flex items-center gap-1 sm:gap-2">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  <span className="hidden sm:inline">Descargar</span>
-                </span>
-              </button>
-
-              {/* Botón Nuevo Cliente */}
-              <button
-                onClick={handleOpenNewClientModal}
-                className="px-3 sm:px-4 py-2 bg-[#F2994A] text-white rounded-md hover:bg-[#d97d23] transition-colors font-semibold shadow text-sm"
-              >
-                + Nuevo Cliente
-              </button>
-            </div>
-          </div>
+    <div className="p-6 bg-[#F7F3ED] min-h-screen">
+      {/* Controles */}
+      <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+        <div className="flex gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, correo, teléfono o tag..."
+            className="px-4 py-2 border rounded-md focus:ring focus:ring-yellow-300 transition"
+          />
+          <button
+            onClick={applyFilter}
+            className="px-4 py-2 bg-yellow-700 text-white rounded-md hover:bg-yellow-800 transition"
+          >
+            Filtrar
+          </button>
         </div>
-
-        {/* Mostrar tags aplicadas como pildoras */}
-        {currentAppliedFilters.selectedTags.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-[#211B17] font-semibold">Tags Aplicadas:</span>
-            {currentAppliedFilters.selectedTags.map(tag => (
-              <span key={tag} className="inline-flex items-center px-3 py-1 rounded-full bg-[#F2994A] text-white text-sm font-medium">
-                {tag}
-                <button
-                  onClick={() => handleApplyTagsFromModal(currentAppliedFilters.selectedTags.filter(t => t !== tag))}
-                  className="ml-2 -mr-1 text-white hover:text-gray-100 focus:outline-none"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
-            ))}
-            <button
-              onClick={() => handleApplyTagsFromModal([])}
-              className="ml-2 text-[#F2994A] hover:underline text-sm"
-            >
-              Limpiar Todas
-            </button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <button
+            onClick={exportExcel}
+            className="px-4 py-2 border rounded-md hover:bg-gray-100 transition"
+          >
+            Exportar Excel
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2 bg-yellow-700 text-white rounded-md hover:bg-yellow-800 transition"
+          >
+            + Crear Cliente
+          </button>
+        </div>
       </div>
 
-      {/* Área de la tabla de clientes - ESTA ES LA ÚNICA QUE DEBE TENER SCROLL VERTICAL */}
-      {/* flex-1 asegura que este div ocupe el resto del espacio vertical disponible */}
-      {/* overflow-y-auto permite el scroll vertical si el contenido excede la altura */}
-      <div className="flex-1 overflow-y-auto px-2 sm:px-4 pb-4"
-           style={{ scrollbarWidth: 'thin', scrollbarColor: '#B24E00 #F7F7ED' }}>
-        <div className="bg-[#211B17] rounded-lg shadow">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-[#F7F7ED]/20">
-                <th className="py-3 px-4 text-left text-[#F7F7ED] font-semibold">Nombre</th>
-                <th className="py-3 px-4 text-left text-[#F7F7ED] font-semibold">Teléfono</th>
-                <th className="py-3 px-4 text-left text-[#F7F7ED] font-semibold">Correo Electrónico</th>
-                <th className="py-3 px-4 text-center text-[#F7F7ED] font-semibold">Visitas</th>
-                <th className="py-3 px-4 text-left text-[#F7F7ED] font-semibold">Última Visita</th>
-                <th className="py-3 px-4 text-left text-[#F7F7ED] font-semibold">Tags del cliente</th>
-                <th className="py-3 px-4 text-right text-[#F7F7ED] font-semibold">Gasto total</th>
-                <th className="py-3 px-4 text-right text-[#F7F7ED] font-semibold">Gasto/Visita</th>
-                <th className="py-3 px-4 text-left text-[#F7F7ED] font-semibold">Nota del perfil</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#F7F7ED]/20">
-              {filteredClients.map((client) => (
-                <tr key={client.id} className="transition-colors hover:bg-[#655644] group">
-                  <td className="py-3 px-4 text-[#F7F7ED] group-hover:text-white">{client.name}</td>
-                  <td className="py-3 px-4 text-[#F7F7ED] group-hover:text-white">{client.phone}</td>
-                  <td className="py-3 px-4 text-[#F7F7ED] group-hover:text-white">{client.email}</td>
-                  <td className="py-3 px-4 text-center text-[#F7F7ED] group-hover:text-white">{client.visits}</td>
-                  <td className="py-3 px-4 text-[#F7F7ED] group-hover:text-white">{client.lastVisit}</td>
-                  <td className="py-3 px-4 text-[#F7F7ED] group-hover:text-white">
-                    {client.tags.length > 0 ? client.tags.map(tag => (
-                      <span key={tag} className="inline-block bg-[#F2994A] text-white text-xs px-2 py-1 rounded-full mr-1 mb-1">
+      {/* Mensajes */}
+      {loading && <p className="text-center">Cargando...</p>}
+      {error && <p className="text-red-700">{error}</p>}
+
+      {/* Tabla */}
+      <div className="overflow-auto">
+        <table className="min-w-full bg-white rounded-lg shadow">
+          <thead className="bg-yellow-800 text-white">
+            <tr>
+              {[
+                'Nombre',
+                'Teléfono',
+                'Correo',
+                'Visitas',
+                'Última Visita',
+                'Tags',
+                'Gasto Total (CLP)',
+                'Gasto Promedio por Visita (CLP)',
+                'Notas',
+                'Acciones',
+              ].map((h) => (
+                <th key={h} className="px-4 py-2 text-left text-sm">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((c, i) => (
+              <tr
+                key={c.id}
+                className={`border-b transition-colors hover:bg-yellow-50 ${
+                  i % 2 === 0 ? '' : 'bg-yellow-100'
+                }`}
+              >
+                <td className="px-4 py-2">
+                  {c.nombre} {c.apellido}
+                </td>
+                <td className="px-4 py-2">{c.telefono}</td>
+                <td className="px-4 py-2">{c.correo_electronico}</td>
+                <td className="px-4 py-2">{c.visitas}</td>
+                <td className="px-4 py-2">{c.ultima_visita ?? '-'}</td>
+                <td className="px-4 py-2 flex flex-wrap gap-1">
+                  {c.tags.length ? (
+                    c.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className={`${getTagColor(tag)} text-white text-xs px-2 py-1 rounded-full`}
+                      >
                         {tag}
                       </span>
-                    )) : '-'}
-                  </td>
-                  <td className="py-3 px-4 text-right text-[#F7F7ED] group-hover:text-white">{client.totalSpent.toFixed(2)}</td>
-                  <td className="py-3 px-4 text-right text-[#F7F7ED] group-hover:text-white">{client.spentPerVisit.toFixed(2)}</td>
-                  <td className="py-3 px-4 text-[#F7F7ED] group-hover:text-white">{client.profileNote}</td>
-                </tr>
-              ))}
-              {filteredClients.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-[#F7F7ED]/70">
-                    No se encontraron clientes.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    ))
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-right">{c.gasto_total.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right">{c.gasto_por_visita.toFixed(2)}</td>
+                <td className="px-4 py-2">{c.notas}</td>
+                <td className="px-4 py-2 flex gap-2">
+                  <button
+                    onClick={() => openEdit(c)}
+                    className="text-yellow-900 hover:text-yellow-800 transition"
+                    aria-label={`Editar cliente ${c.nombre} ${c.apellido}`}
+                  >
+                    <FaPencilAlt />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    className="text-red-700 hover:text-red-900 transition"
+                    aria-label={`Eliminar cliente ${c.nombre} ${c.apellido}`}
+                  >
+                    <FaTrashAlt />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={10} className="py-8 text-center text-gray-500">
+                  No hay clientes para mostrar.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Modales fuera del flujo principal de scroll */}
-      <NewClientModal
-        isOpen={isNewClientModalOpen}
-        onClose={() => setIsNewClientModalOpen(false)}
-        onClientCreated={handleClientCreated}
-      />
+      {/* Modal Crear */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg">
+            <h2 className="text-xl mb-4">Crear Cliente</h2>
+            {createError && <p className="text-red-700 mb-2">{createError}</p>}
 
-      <TagsModal
-        isOpen={isTagsModalOpen}
-        onClose={() => setIsTagsModalOpen(false)}
-        onApplyTags={handleApplyTagsFromModal}
-        currentSelectedTags={currentAppliedFilters.selectedTags}
-      />
+            <div className="space-y-2">
+              <input
+                placeholder="Nombre"
+                value={newData.nombre || ''}
+                onChange={(e) => setNewData({ ...newData, nombre: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <input
+                placeholder="Apellido"
+                value={newData.apellido || ''}
+                onChange={(e) => setNewData({ ...newData, apellido: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <input
+                placeholder="Correo"
+                type="email"
+                value={newData.correo_electronico || ''}
+                onChange={(e) => setNewData({ ...newData, correo_electronico: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <input
+                placeholder="Teléfono"
+                value={newData.telefono || ''}
+                onChange={(e) => setNewData({ ...newData, telefono: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <textarea
+                placeholder="Notas"
+                value={newData.notas || ''}
+                onChange={(e) => setNewData({ ...newData, notas: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+                rows={3}
+              />
+              <button
+                onClick={() => setShowTagsCreate(true)}
+                className="w-full px-4 py-2 bg-yellow-700 text-white rounded-md hover:bg-yellow-800 transition"
+              >
+                Tags ({newData.tags.length})
+              </button>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowCreate(false)}
+                disabled={creating}
+                className="px-4 py-2 border rounded-md hover:bg-gray-100 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="px-4 py-2 bg-yellow-700 text-white rounded-md hover:bg-yellow-800 transition"
+              >
+                {creating ? 'Creando...' : 'Crear'}
+              </button>
+            </div>
+
+            <TagsModal
+              isOpen={showTagsCreate}
+              onClose={() => setShowTagsCreate(false)}
+              onApplyTags={(tags) => {
+                setNewData((d) => ({ ...d, tags }));
+                setShowTagsCreate(false);
+              }}
+              currentSelectedTags={newData.tags}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar */}
+      {showEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg">
+            <h2 className="text-xl mb-4">Editar Cliente</h2>
+            {editError && <p className="text-red-700 mb-2">{editError}</p>}
+
+            <div className="space-y-2">
+              <input
+                placeholder="Nombre"
+                value={editData.nombre || ''}
+                onChange={(e) => handleEditField('nombre', e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <input
+                placeholder="Apellido"
+                value={editData.apellido || ''}
+                onChange={(e) => handleEditField('apellido', e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <input
+                placeholder="Correo"
+                type="email"
+                value={editData.correo_electronico || ''}
+                onChange={(e) => handleEditField('correo_electronico', e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <input
+                placeholder="Teléfono"
+                value={editData.telefono || ''}
+                onChange={(e) => handleEditField('telefono', e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <input
+                placeholder="Número total de visitas del cliente"
+                type="number"
+                min={0}
+                value={editData.visitas ?? 0}
+                onChange={(e) => handleEditField('visitas', Number(e.target.value))}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Cantidad total de veces que el cliente ha visitado el local.
+              </p>
+
+              <input
+                placeholder="Promedio gastado por visita (CLP)"
+                type="number"
+                min={0}
+                step={0.01}
+                value={editData.gasto_por_visita ?? 0}
+                onChange={(e) => handleEditField('gasto_por_visita', Number(e.target.value))}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Monto promedio que el cliente gasta en cada visita.
+              </p>
+
+              <input
+                placeholder="Gasto Total (Calculado automáticamente)"
+                type="number"
+                disabled
+                value={editData.gasto_total?.toFixed(2) ?? '0.00'}
+                className="w-full px-3 py-2 border rounded-md bg-gray-100 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Calculado automáticamente: Visitas × Gasto por visita
+              </p>
+
+              <textarea
+                placeholder="Notas"
+                value={editData.notas || ''}
+                onChange={(e) => handleEditField('notas', e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:ring transition"
+                rows={3}
+              />
+
+              <button
+                onClick={() => setShowTagsEdit(true)}
+                className="w-full px-4 py-2 bg-yellow-700 text-white rounded-md hover:bg-yellow-800 transition"
+              >
+                Tags ({editData.tags?.length ?? 0})
+              </button>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowEdit(false)}
+                disabled={editing}
+                className="px-4 py-2 border rounded-md hover:bg-gray-100 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEdit}
+                disabled={editing}
+                className="px-4 py-2 bg-yellow-700 text-white rounded-md hover:bg-yellow-800 transition"
+              >
+                {editing ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+
+            <TagsModal
+              isOpen={showTagsEdit}
+              onClose={() => setShowTagsEdit(false)}
+              onApplyTags={(tags) => {
+                setEditData((d) => ({ ...d, tags }));
+                setShowTagsEdit(false);
+              }}
+              currentSelectedTags={editData.tags}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
