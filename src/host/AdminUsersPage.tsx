@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { FaTrashAlt, FaPencilAlt } from 'react-icons/fa';
 
 interface User {
@@ -9,18 +10,17 @@ interface User {
   rol: string;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const AdminUsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // Simulación usuario logueado (reemplaza con tu lógica real, ej localStorage o context)
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Cargar usuario actual y usuarios
   useEffect(() => {
-    // Ejemplo: obtener usuario actual de localStorage
     const storedUser = localStorage.getItem('user');
     if (storedUser) setCurrentUser(JSON.parse(storedUser));
 
@@ -29,10 +29,8 @@ const AdminUsersPage: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/users');
-      if (!res.ok) throw new Error('Error al cargar usuarios');
-      const data = await res.json();
-      setUsers(data);
+      const res = await axios.get(`${API_BASE_URL}/api/users`);
+      setUsers(res.data);
     } catch (error) {
       console.error(error);
       alert('Error al cargar usuarios');
@@ -52,7 +50,6 @@ const AdminUsersPage: React.FC = () => {
     setIsEditUserModalOpen(true);
   };
 
-  // Crear usuario
   const handleNewUserSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
@@ -66,26 +63,18 @@ const AdminUsersPage: React.FC = () => {
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/users', {
-        method: 'POST',
+      const res = await axios.post(`${API_BASE_URL}/api/users`, newUser, {
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser),
       });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al crear usuario');
-      }
-      const data = await res.json();
-      setUsers((prev) => [...prev, data.user]);
+      setUsers((prev) => [...prev, res.data.user]);
       alert('Usuario creado exitosamente');
       handleCloseModal();
       form.reset();
     } catch (error: any) {
-      alert(`Error: ${error.message}`);
+      alert(`Error: ${error.response?.data?.message || error.message || 'Error al crear usuario'}`);
     }
   };
 
-  // Editar usuario
   const handleEditUserSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
@@ -100,40 +89,26 @@ const AdminUsersPage: React.FC = () => {
     const userId = (form.elements.namedItem('editUserId') as HTMLInputElement).value;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${userId}`, {
-        method: 'PUT',
+      const res = await axios.put(`${API_BASE_URL}/api/users/${userId}`, updatedUser, {
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedUser),
       });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al actualizar usuario');
-      }
-      const data = await res.json();
-      setUsers((prev) => prev.map((u) => (u.id === userId ? data.user : u)));
+      setUsers((prev) => prev.map((u) => (u.id === userId ? res.data.user : u)));
       alert('Usuario actualizado exitosamente');
       handleCloseModal();
     } catch (error: any) {
-      alert(`Error: ${error.message}`);
+      alert(`Error: ${error.response?.data?.message || error.message || 'Error al actualizar usuario'}`);
     }
   };
 
-  // Eliminar usuario
   const eliminarUsuario = async (id: number | string) => {
     if (!window.confirm('¿Seguro que quieres eliminar este usuario?')) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al eliminar usuario');
-      }
+      await axios.delete(`${API_BASE_URL}/api/users/${id}`);
       setUsers((prev) => prev.filter((u) => u.id !== id));
       alert('Usuario eliminado correctamente');
     } catch (error: any) {
-      alert(`Error eliminando usuario: ${error.message}`);
+      alert(`Error eliminando usuario: ${error.response?.data?.message || error.message || 'Error al eliminar usuario'}`);
     }
   };
 
