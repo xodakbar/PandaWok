@@ -1,292 +1,332 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { FaTrashAlt, FaPencilAlt } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
 
 interface User {
   id: number | string;
   nombre_usuario: string;
-  apellido_usuario?: string;
+  apellido_usuario: string;
   correo_electronico: string;
   rol: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
 const AdminUsersPage: React.FC = () => {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   const [users, setUsers] = useState<User[]>([]);
-  const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
-  const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Campos para crear y editar
+  const [formData, setFormData] = useState({
+    nombre_usuario: '',
+    apellido_usuario: '',
+    correo_electronico: '',
+    contrasena: '',
+    rol: 'anfitrion',
+  });
 
+  // Carga usuarios al montar
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) setCurrentUser(JSON.parse(storedUser));
-
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  async function fetchUsers() {
+    setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/users`);
-      setUsers(res.data);
-    } catch (error) {
-      console.error(error);
-      alert('Error al cargar usuarios');
+      const res = await fetch(`${API_BASE_URL}/api/users`);
+      if (!res.ok) throw new Error('Error al cargar usuarios');
+      const data = await res.json();
+      setUsers(data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const handleOpenNewUserModal = () => setIsNewUserModalOpen(true);
-  const handleCloseModal = () => {
-    setIsNewUserModalOpen(false);
-    setIsEditUserModalOpen(false);
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  }
+
+  function openCreateModal() {
+    setFormData({ nombre_usuario: '', apellido_usuario: '', correo_electronico: '', contrasena: '', rol: 'anfitrion' });
+    setShowCreateModal(true);
+  }
+  function closeModals() {
+    setShowCreateModal(false);
+    setShowEditModal(false);
     setEditingUser(null);
-  };
+    setError(null);
+  }
 
-  const handleEditClick = (userId: number | string) => {
-    const userToEdit = users.find((u) => u.id === userId) || null;
-    setEditingUser(userToEdit);
-    setIsEditUserModalOpen(true);
-  };
-
-  const handleNewUserSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const form = event.target as HTMLFormElement;
-
-    const newUser = {
-      nombre_usuario: (form.elements.namedItem('newUserName') as HTMLInputElement).value,
-      apellido_usuario: (form.elements.namedItem('newUserLastName') as HTMLInputElement)?.value || '',
-      correo_electronico: (form.elements.namedItem('newUserEmail') as HTMLInputElement).value,
-      contrasena: (form.elements.namedItem('newUserPassword') as HTMLInputElement).value,
-      rol: (form.elements.namedItem('newUserRole') as HTMLSelectElement).value.toLowerCase(),
-    };
-
+  // Crear usuario
+  async function handleCreateSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formData.nombre_usuario || !formData.apellido_usuario || !formData.correo_electronico || !formData.contrasena || !formData.rol) {
+      alert('Completa todos los campos');
+      return;
+    }
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/users`, newUser, {
+      const res = await fetch(`${API_BASE_URL}/api/users`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
       });
-      setUsers((prev) => [...prev, res.data.user]);
-      alert('Usuario creado exitosamente');
-      handleCloseModal();
-      form.reset();
-    } catch (error: any) {
-      alert(`Error: ${error.response?.data?.message || error.message || 'Error al crear usuario'}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al crear usuario');
+      setUsers([...users, data.user]);
+      alert('Usuario creado');
+      closeModals();
+    } catch (err: any) {
+      alert(err.message);
     }
-  };
+  }
 
-  const handleEditUserSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const form = event.target as HTMLFormElement;
+  // Abrir modal edición
+  function openEditModal(user: User) {
+    setEditingUser(user);
+    setFormData({
+      nombre_usuario: user.nombre_usuario,
+      apellido_usuario: user.apellido_usuario,
+      correo_electronico: user.correo_electronico,
+      contrasena: '', // No se edita aquí
+      rol: user.rol,
+    });
+    setShowEditModal(true);
+  }
 
-    const updatedUser = {
-      nombre_usuario: (form.elements.namedItem('editUserName') as HTMLInputElement).value,
-      apellido_usuario: (form.elements.namedItem('editUserLastName') as HTMLInputElement)?.value || '',
-      correo_electronico: (form.elements.namedItem('editUserEmail') as HTMLInputElement).value,
-      rol: (form.elements.namedItem('editUserRole') as HTMLSelectElement).value.toLowerCase(),
-    };
+  // Editar usuario
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingUser) return;
 
-    const userId = (form.elements.namedItem('editUserId') as HTMLInputElement).value;
+    const { nombre_usuario, apellido_usuario, correo_electronico, rol } = formData;
+    if (!nombre_usuario || !apellido_usuario || !correo_electronico || !rol) {
+      alert('Completa todos los campos');
+      return;
+    }
 
     try {
-      const res = await axios.put(`${API_BASE_URL}/api/users/${userId}`, updatedUser, {
+      const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre_usuario, apellido_usuario, correo_electronico, rol }),
       });
-      setUsers((prev) => prev.map((u) => (u.id === userId ? res.data.user : u)));
-      alert('Usuario actualizado exitosamente');
-      handleCloseModal();
-    } catch (error: any) {
-      alert(`Error: ${error.response?.data?.message || error.message || 'Error al actualizar usuario'}`);
-    }
-  };
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al actualizar usuario');
 
-  const eliminarUsuario = async (id: number | string) => {
-    if (!window.confirm('¿Seguro que quieres eliminar este usuario?')) return;
+      setUsers(users.map(u => (u.id === editingUser.id ? data.user : u)));
+      alert('Usuario actualizado');
+      closeModals();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
+
+  // Eliminar usuario
+  async function handleDelete(userId: number | string) {
+    if (!confirm('¿Seguro quieres eliminar este usuario?')) return;
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/users/${id}`);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-      alert('Usuario eliminado correctamente');
-    } catch (error: any) {
-      alert(`Error eliminando usuario: ${error.response?.data?.message || error.message || 'Error al eliminar usuario'}`);
+      const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al eliminar usuario');
+
+      setUsers(users.filter(u => u.id !== userId));
+      alert('Usuario eliminado');
+    } catch (err: any) {
+      alert(err.message);
     }
-  };
+  }
 
   return (
-    <div className="font-sans p-5 bg-gray-50 text-gray-800">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-7xl mx-auto my-5">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-gray-200">
-          <h2 className="text-3xl font-semibold text-gray-800 mb-4 md:mb-0">Administrar Usuarios</h2>
-          {currentUser?.rol === 'administrador' && (
-            <button
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md text-base flex items-center gap-2 transition duration-300 ease-in-out"
-              onClick={handleOpenNewUserModal}
-            >
-              Nuevo Usuario
-            </button>
-          )}
-        </header>
+    <div className="p-6 max-w-7xl mx-auto font-sans">
+      <h1 className="text-3xl font-bold mb-6">Administrar Usuarios</h1>
 
-        <div className="overflow-x-auto">
-          {users.length === 0 ? (
-            <p className="text-center py-10 text-gray-500">No hay usuarios para mostrar.</p>
-          ) : (
-            <table className="min-w-full bg-white">
-              <thead>
-                <tr>
-                  <th className="py-3 px-4 text-left bg-blue-50 text-gray-700 font-semibold text-sm uppercase tracking-wider">Nombre</th>
-                  <th className="py-3 px-4 text-left bg-blue-50 text-gray-700 font-semibold text-sm uppercase tracking-wider">Apellido</th>
-                  <th className="py-3 px-4 text-left bg-blue-50 text-gray-700 font-semibold text-sm uppercase tracking-wider">Correo Electrónico</th>
-                  <th className="py-3 px-4 text-left bg-blue-50 text-gray-700 font-semibold text-sm uppercase tracking-wider">Rol</th>
-                  {currentUser?.rol === 'administrador' && (
-                    <th className="py-3 px-4 text-left bg-blue-50 text-gray-700 font-semibold text-sm uppercase tracking-wider">Acciones</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="py-3 px-4">{user.nombre_usuario}</td>
-                    <td className="py-3 px-4">{user.apellido_usuario}</td>
-                    <td className="py-3 px-4">{user.correo_electronico}</td>
-                    <td className="py-3 px-4">{user.rol}</td>
-                    {currentUser?.rol === 'administrador' && (
-                      <td className="py-3 px-4 flex gap-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-800 text-lg p-1 transition duration-300 ease-in-out"
-                          onClick={() => handleEditClick(user.id)}
-                          title="Editar usuario"
-                        >
-                          <FaPencilAlt />
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800 text-lg p-1 transition duration-300 ease-in-out"
-                          onClick={() => eliminarUsuario(user.id)}
-                          title="Eliminar usuario"
-                        >
-                          <FaTrashAlt />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+      <button
+        className="mb-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        onClick={openCreateModal}
+      >
+        Nuevo Usuario
+      </button>
 
-        {/* Modal Nuevo Usuario */}
-        {isNewUserModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-8 w-11/12 max-w-lg relative">
-              <span
-                className="absolute top-4 right-6 text-gray-400 text-3xl font-bold cursor-pointer hover:text-gray-700"
-                onClick={handleCloseModal}
-              >
-                &times;
-              </span>
-              <h3 className="text-2xl font-semibold text-gray-800 mb-6 text-center">Nuevo Usuario</h3>
-              <form onSubmit={handleNewUserSubmit}>
-                <div className="mb-4">
-                  <label htmlFor="newUserName" className="block text-gray-700 text-sm font-medium mb-2">Nombre:</label>
-                  <input type="text" id="newUserName" name="newUserName" required className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="newUserLastName" className="block text-gray-700 text-sm font-medium mb-2">Apellido:</label>
-                  <input type="text" id="newUserLastName" name="newUserLastName" required className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="newUserEmail" className="block text-gray-700 text-sm font-medium mb-2">Correo Electrónico:</label>
-                  <input type="email" id="newUserEmail" name="newUserEmail" required className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="newUserPassword" className="block text-gray-700 text-sm font-medium mb-2">Contraseña:</label>
-                  <input type="password" id="newUserPassword" name="newUserPassword" required className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="newUserRole" className="block text-gray-700 text-sm font-medium mb-2">Rol:</label>
-                  <select id="newUserRole" name="newUserRole" required defaultValue="anfitrion" className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="administrador">Administrador</option>
-                    <option value="jefe">Jefe</option>
-                    <option value="anfitrion">Anfitrión</option>
-                  </select>
-                </div>
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md w-full transition duration-300 ease-in-out">
-                  Crear Usuario
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
+      {loading && <p>Cargando usuarios...</p>}
+      {error && <p className="text-red-600">{error}</p>}
 
-        {/* Modal Editar Usuario */}
-        {isEditUserModalOpen && editingUser && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-8 w-11/12 max-w-lg relative">
-              <span
-                className="absolute top-4 right-6 text-gray-400 text-3xl font-bold cursor-pointer hover:text-gray-700"
-                onClick={handleCloseModal}
-              >
-                &times;
-              </span>
-              <h3 className="text-2xl font-semibold text-gray-800 mb-6 text-center">Editar Usuario</h3>
-              <form onSubmit={handleEditUserSubmit}>
-                <input type="hidden" id="editUserId" name="editUserId" value={editingUser.id} />
-                <div className="mb-4">
-                  <label htmlFor="editUserName" className="block text-gray-700 text-sm font-medium mb-2">Nombre:</label>
-                  <input
-                    type="text"
-                    id="editUserName"
-                    name="editUserName"
-                    required
-                    defaultValue={editingUser.nombre_usuario}
-                    className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="editUserLastName" className="block text-gray-700 text-sm font-medium mb-2">Apellido:</label>
-                  <input
-                    type="text"
-                    id="editUserLastName"
-                    name="editUserLastName"
-                    required
-                    defaultValue={editingUser.apellido_usuario}
-                    className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="editUserEmail" className="block text-gray-700 text-sm font-medium mb-2">Correo Electrónico:</label>
-                  <input
-                    type="email"
-                    id="editUserEmail"
-                    name="editUserEmail"
-                    required
-                    defaultValue={editingUser.correo_electronico}
-                    className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="editUserRole" className="block text-gray-700 text-sm font-medium mb-2">Rol:</label>
-                  <select
-                    id="editUserRole"
-                    name="editUserRole"
-                    required
-                    defaultValue={editingUser.rol}
-                    className="shadow-sm border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      {!loading && !error && (
+        <table className="w-full border-collapse border border-gray-300">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border border-gray-300 p-2">Nombre</th>
+              <th className="border border-gray-300 p-2">Apellido</th>
+              <th className="border border-gray-300 p-2">Correo Electrónico</th>
+              <th className="border border-gray-300 p-2">Rol</th>
+              <th className="border border-gray-300 p-2">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map(user => (
+              <tr key={user.id} className="hover:bg-gray-50">
+                <td className="border border-gray-300 p-2">{user.nombre_usuario}</td>
+                <td className="border border-gray-300 p-2">{user.apellido_usuario}</td>
+                <td className="border border-gray-300 p-2">{user.correo_electronico}</td>
+                <td className="border border-gray-300 p-2 capitalize">{user.rol}</td>
+                <td className="border border-gray-300 p-2 space-x-2">
+                  <button
+                    onClick={() => openEditModal(user)}
+                    className="bg-yellow-400 hover:bg-yellow-500 px-3 py-1 rounded"
                   >
-                    <option value="administrador">Administrador</option>
-                    <option value="jefe">Jefe</option>
-                    <option value="anfitrion">Anfitrión</option>
-                  </select>
-                </div>
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md w-full transition duration-300 ease-in-out">
-                  Guardar Cambios
-                </button>
-              </form>
-            </div>
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(user.id)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-center p-4 text-gray-500">
+                  No hay usuarios para mostrar.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+
+      {/* Modal Crear Usuario */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg w-96 relative">
+            <button
+              className="absolute top-2 right-3 text-xl font-bold hover:text-gray-600"
+              onClick={closeModals}
+            >
+              &times;
+            </button>
+            <h2 className="text-xl font-semibold mb-4">Crear Nuevo Usuario</h2>
+            <form onSubmit={handleCreateSubmit} className="space-y-3">
+              <input
+                type="text"
+                name="nombre_usuario"
+                placeholder="Nombre"
+                value={formData.nombre_usuario}
+                onChange={handleChange}
+                required
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="text"
+                name="apellido_usuario"
+                placeholder="Apellido"
+                value={formData.apellido_usuario}
+                onChange={handleChange}
+                required
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="email"
+                name="correo_electronico"
+                placeholder="Correo Electrónico"
+                value={formData.correo_electronico}
+                onChange={handleChange}
+                required
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="password"
+                name="contrasena"
+                placeholder="Contraseña"
+                value={formData.contrasena}
+                onChange={handleChange}
+                required
+                className="w-full border p-2 rounded"
+              />
+              <select
+                name="rol"
+                value={formData.rol}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              >
+                <option value="administrador">Administrador</option>
+                <option value="jefe">Jefe</option>
+                <option value="anfitrion">Anfitrión</option>
+              </select>
+              <button type="submit" className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700">
+                Crear
+              </button>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Modal Editar Usuario */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg w-96 relative">
+            <button
+              className="absolute top-2 right-3 text-xl font-bold hover:text-gray-600"
+              onClick={closeModals}
+            >
+              &times;
+            </button>
+            <h2 className="text-xl font-semibold mb-4">Editar Usuario</h2>
+            <form onSubmit={handleEditSubmit} className="space-y-3">
+              <input
+                type="text"
+                name="nombre_usuario"
+                placeholder="Nombre"
+                value={formData.nombre_usuario}
+                onChange={handleChange}
+                required
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="text"
+                name="apellido_usuario"
+                placeholder="Apellido"
+                value={formData.apellido_usuario}
+                onChange={handleChange}
+                required
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="email"
+                name="correo_electronico"
+                placeholder="Correo Electrónico"
+                value={formData.correo_electronico}
+                onChange={handleChange}
+                required
+                className="w-full border p-2 rounded"
+              />
+              {/* No se edita contraseña aquí */}
+              <select
+                name="rol"
+                value={formData.rol}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              >
+                <option value="administrador">Administrador</option>
+                <option value="jefe">Jefe</option>
+                <option value="anfitrion">Anfitrión</option>
+              </select>
+              <button type="submit" className="bg-yellow-500 text-white w-full py-2 rounded hover:bg-yellow-600">
+                Guardar Cambios
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
