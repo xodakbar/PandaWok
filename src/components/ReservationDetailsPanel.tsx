@@ -26,7 +26,7 @@ interface Reserva {
   id: number;
   cliente_id: number | null;
   mesa_id: number;
-  fecha_reserva: string; // ISO string o "yyyy-MM-dd"
+  fecha_reserva: string;
   cantidad_personas: number;
   notas?: string;
   horario_id?: number;
@@ -38,7 +38,7 @@ interface Reserva {
 interface Props {
   reservaId: number;
   onClose: () => void;
-  onReservaActualizada?: () => void; // Prop opcional para avisar actualización
+  onReservaActualizada?: () => void;
 }
 
 const ReservationDetailsPanel: React.FC<Props> = ({
@@ -66,6 +66,12 @@ const ReservationDetailsPanel: React.FC<Props> = ({
   };
 
   useEffect(() => {
+    if (!reservaId || reservaId <= 0) {
+      setError('ID de reserva inválido');
+      setLoading(false);
+      return;
+    }
+
     const fetchReserva = async () => {
       try {
         setLoading(true);
@@ -107,7 +113,6 @@ const ReservationDetailsPanel: React.FC<Props> = ({
         notas: formData.notas,
       });
 
-      // Verifica que cliente_id exista antes de actualizar cliente
       if (!reserva?.cliente_id) {
         alert('No se pudo actualizar el cliente: cliente_id no válido.');
         return;

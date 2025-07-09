@@ -8,7 +8,6 @@ import BlockTableModal from '../components/BlockTableModal';
 import AgregarMesaModal from '../components/NuevaMesaModal';
 import WalkInModal from '../components/WalkInModal';
 
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 interface Salon {
@@ -78,6 +77,7 @@ const Timeline: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showWalkInModal, setShowWalkInModal] = useState(false);
 
+  // Carga salones
   useEffect(() => {
     const fetchSalones = async () => {
       try {
@@ -92,6 +92,7 @@ const Timeline: React.FC = () => {
     fetchSalones();
   }, []);
 
+  // Carga mesas cuando cambia el salón seleccionado
   useEffect(() => {
     if (!selectedSalonId) return;
 
@@ -117,6 +118,7 @@ const Timeline: React.FC = () => {
     fetchMesas();
   }, [selectedSalonId]);
 
+  // Carga reservas y bloqueos cuando cambia la mesa o la fecha
   useEffect(() => {
     if (!mesaSeleccionada) {
       setReservasMesa([]);
@@ -128,20 +130,18 @@ const Timeline: React.FC = () => {
 
     const fetchReservasYBloqueos = async () => {
       try {
-        const resReservas = await axios.get(`${API_BASE_URL}/api/reservas/mesa/${mesaSeleccionada.id}`, {
-          params: { fecha: fechaSeleccionada },
-          validateStatus: (status) => status === 200 || status === 404,
-        });
-        const reservas = resReservas.status === 200 ? resReservas.data.reservas || [] : [];
-        setReservasMesa(reservas);
-
-        const resBloqueos = await axios.get(`${API_BASE_URL}/api/mesas/bloqueos/mesa/${mesaSeleccionada.id}`, {
-          params: { fecha: fechaSeleccionada },
-          validateStatus: (status) => status === 200 || status === 404,
-        });
-        const bloqueos = resBloqueos.status === 200 ? resBloqueos.data.bloqueos || [] : [];
-        setBloqueosMesa(bloqueos);
-
+        const [resReservas, resBloqueos] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/reservas/mesa/${mesaSeleccionada.id}`, {
+            params: { fecha: fechaSeleccionada },
+            validateStatus: (status) => status === 200 || status === 404,
+          }),
+          axios.get(`${API_BASE_URL}/api/mesas/bloqueos/mesa/${mesaSeleccionada.id}`, {
+            params: { fecha: fechaSeleccionada },
+            validateStatus: (status) => status === 200 || status === 404,
+          }),
+        ]);
+        setReservasMesa(resReservas.status === 200 ? resReservas.data.reservas || [] : []);
+        setBloqueosMesa(resBloqueos.status === 200 ? resBloqueos.data.bloqueos || [] : []);
         setReservaSeleccionada(null);
         setBloqueoSeleccionado(null);
       } catch (error) {
@@ -153,6 +153,7 @@ const Timeline: React.FC = () => {
     fetchReservasYBloqueos();
   }, [mesaSeleccionada, fechaSeleccionada]);
 
+  // Mover mesa y guardar posición
   const handleDragEnd = async (mesaId: number, info: any) => {
     const { offset } = info;
     setMesas((prevMesas) =>
@@ -172,6 +173,7 @@ const Timeline: React.FC = () => {
     );
   };
 
+  // Bloquear mesa
   const handleBlockTable = async (tableId: number, startTime: string, endTime: string, date: string) => {
     try {
       await axios.post(`${API_BASE_URL}/api/mesas/bloqueos/`, {
@@ -193,6 +195,7 @@ const Timeline: React.FC = () => {
     }
   };
 
+  // Desbloquear mesa
   const handleUnlockTable = async (bloqueoId: number) => {
     try {
       await axios.put(`${API_BASE_URL}/api/mesas/bloqueos/${bloqueoId}/desbloquear`);
@@ -205,6 +208,7 @@ const Timeline: React.FC = () => {
     }
   };
 
+  // Agregar nueva mesa
   const handleAgregarMesa = async (mesaData: { salon_id: number; tipo_mesa: string; tamanio: string }) => {
     try {
       await axios.post(`${API_BASE_URL}/api/mesas`, mesaData);
@@ -228,7 +232,9 @@ const Timeline: React.FC = () => {
     <div className="flex h-screen bg-gray-50">
       {/* Panel izquierdo */}
       <aside className="w-80 bg-[#FDF6E3] p-4 flex flex-col text-gray-800 shadow-lg">
-        <label htmlFor="fechaSeleccionada" className="mb-2 font-semibold">Seleccionar Fecha</label>
+        <label htmlFor="fechaSeleccionada" className="mb-2 font-semibold">
+          Seleccionar Fecha
+        </label>
         <input
           type="date"
           id="fechaSeleccionada"
@@ -255,16 +261,24 @@ const Timeline: React.FC = () => {
                     }`}
                     onClick={() => setBloqueoSeleccionado(bloqueo)}
                   >
-                    <p className="font-semibold">🕒 {bloqueo.hora_inicio} - {bloqueo.hora_fin}</p>
+                    <p className="font-semibold">
+                      🕒 {bloqueo.hora_inicio} - {bloqueo.hora_fin}
+                    </p>
                     <p className="text-xs">📅 {bloqueo.fecha}</p>
                   </div>
                 ))}
 
                 {bloqueoSeleccionado && (
                   <div className="mt-3 p-3 bg-red-200 rounded border border-red-500 text-sm">
-                    <p><strong>Fecha:</strong> {bloqueoSeleccionado.fecha}</p>
-                    <p><strong>Inicio:</strong> {bloqueoSeleccionado.hora_inicio}</p>
-                    <p><strong>Fin:</strong> {bloqueoSeleccionado.hora_fin}</p>
+                    <p>
+                      <strong>Fecha:</strong> {bloqueoSeleccionado.fecha}
+                    </p>
+                    <p>
+                      <strong>Inicio:</strong> {bloqueoSeleccionado.hora_inicio}
+                    </p>
+                    <p>
+                      <strong>Fin:</strong> {bloqueoSeleccionado.hora_fin}
+                    </p>
                     <button
                       onClick={() => handleUnlockTable(bloqueoSeleccionado.id)}
                       className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
@@ -338,7 +352,12 @@ const Timeline: React.FC = () => {
               <button
                 onClick={async () => {
                   if (!mesaSeleccionada) return;
-                  if (!window.confirm(`¿Eliminar mesa ${mesaSeleccionada.numero_mesa}? Esta acción no se puede deshacer.`)) return;
+                  if (
+                    !window.confirm(
+                      `¿Eliminar mesa ${mesaSeleccionada.numero_mesa}? Esta acción no se puede deshacer.`
+                    )
+                  )
+                    return;
                   try {
                     await axios.delete(`${API_BASE_URL}/api/mesas/${mesaSeleccionada.id}`);
                     alert('Mesa eliminada correctamente');
@@ -391,7 +410,10 @@ const Timeline: React.FC = () => {
           </div>
         </div>
 
-        <div ref={containerRef} className="relative w-full h-[calc(100vh-160px)] bg-white rounded shadow p-4">
+        <div
+          ref={containerRef}
+          className="relative w-full h-[calc(100vh-160px)] bg-white rounded shadow p-4"
+        >
           {mesas.map((mesa) => {
             const bloqueosDeMesa = bloqueosMesa.filter((b) => b.mesa_id === mesa.id);
 
@@ -431,7 +453,9 @@ const Timeline: React.FC = () => {
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               >
                 <div className="text-sm">{mesa.numero_mesa}</div>
-                {bloqueosDeMesa.length > 0 && <div className="text-xs text-red-700 mt-1">Bloqueada</div>}
+                {bloqueosDeMesa.length > 0 && (
+                  <div className="text-xs text-red-700 mt-1">Bloqueada</div>
+                )}
               </motion.div>
             );
           })}
@@ -455,7 +479,6 @@ const Timeline: React.FC = () => {
           onReservationCreate={(newRes) => {
             setReservaSeleccionada(newRes);
             setShowNewReservationModal(false);
-            // refrescar reservas para esa mesa y fecha
           }}
         />
       )}
@@ -464,8 +487,8 @@ const Timeline: React.FC = () => {
         <BlockTableModal
           isOpen={showBlockTableModal}
           onClose={() => setShowBlockTableModal(false)}
-          tableId={mesaSeleccionada?.id || null}
-          currentSalonName={salones.find(s => s.id === selectedSalonId)?.nombre || ''}
+          tableId={mesaSeleccionada.id}
+          currentSalonName={salones.find((s) => s.id === selectedSalonId)?.nombre || ''}
           generateTimeOptions={generateTimeOptions}
           fechaSeleccionada={fechaSeleccionada}
           onBlock={(tableId, startTime, endTime, fecha) => {
@@ -474,6 +497,7 @@ const Timeline: React.FC = () => {
           }}
         />
       )}
+
       {showWalkInModal && mesaSeleccionada && (
         <WalkInModal
           mesaId={mesaSeleccionada.id}
@@ -488,15 +512,15 @@ const Timeline: React.FC = () => {
         />
       )}
 
-            {showAgregarMesaModal && (
-              <AgregarMesaModal
-                salones={salones}
-                onClose={() => setShowAgregarMesaModal(false)}
-                onAgregar={handleAgregarMesa}
-              />
-            )}
-          </div>
-        );
-      };
+      {showAgregarMesaModal && (
+        <AgregarMesaModal
+          salones={salones}
+          onClose={() => setShowAgregarMesaModal(false)}
+          onAgregar={handleAgregarMesa}
+        />
+      )}
+    </div>
+  );
+};
 
 export default Timeline;
