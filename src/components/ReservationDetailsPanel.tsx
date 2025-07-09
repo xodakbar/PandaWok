@@ -1,16 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import {
-  User,
-  Calendar,
-  Users,
-  StickyNote,
-  Phone,
-  Mail,
-  X,
-  Edit,
-  Trash,
+  Calendar, Clock, Users, StickyNote, MapPin, Upload,
+  Tag, X, Send, TicketCheck, Trash, CheckCircle
 } from 'lucide-react';
+import ClientTagsModal from './ClientTagsModal';
+import { motion } from 'framer-motion';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -29,319 +25,511 @@ interface Reserva {
   fecha_reserva: string;
   cantidad_personas: number;
   notas?: string;
-  horario_id?: number;
   horario_descripcion?: string;
   cliente?: Cliente;
   mesa_numero?: string;
+  duracion?: number;
+  origen?: string;
+  fecha_creacion?: string;
+  tags?: string[];
+  status?: string;
 }
 
 interface Props {
   reservaId: number;
   onClose: () => void;
-  onReservaActualizada?: () => void;
+  onReservaFinalizada: () => void;  // Nueva prop para refrescar
 }
 
-const ReservationDetailsPanel: React.FC<Props> = ({
-  reservaId,
-  onClose,
-  onReservaActualizada,
-}) => {
+const ReservationDetailsPanel: React.FC<Props> = ({ reservaId, onClose }) => {
   const [reserva, setReserva] = useState<Reserva | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
+  const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'reservas' | 'perfil' | 'actividad' | 'historial'>('reservas');
+  const [perfilData, setPerfilData] = useState({
     nombre: '',
     apellido: '',
-    correo_electronico: '',
+    cumpleanos: '',
+    empresa: '',
     telefono: '',
-    fecha_reserva: '',
-    cantidad_personas: 1,
-    notas: '',
+    email: '',
+    membresiaNumero: '',
+    membresiaNivel: '',
+    notasPerfil: '',
+    suscrito: false,
+    tagsCliente: [] as string[],
   });
-
-  const toDateInputValue = (isoString: string | undefined) => {
-    if (!isoString) return '';
-    return isoString.split('T')[0];
-  };
+  const [actionLoading, setActionLoading] = useState(false);
+  const [historial, setHistorial] = useState<Reserva[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   useEffect(() => {
-    if (!reservaId || reservaId <= 0) {
-      setError('ID de reserva inválido');
-      setLoading(false);
-      return;
-    }
-
-    const fetchReserva = async () => {
+    const fetchReservaYHistorial = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
         const res = await axios.get(`${API_BASE_URL}/api/reservas/${reservaId}`);
         const data = res.data.reserva || res.data;
-
         setReserva(data);
-        setFormData({
-          nombre: data.cliente?.nombre || '',
-          apellido: data.cliente?.apellido || '',
-          correo_electronico: data.cliente?.correo_electronico || '',
-          telefono: data.cliente?.telefono || '',
-          fecha_reserva: toDateInputValue(data.fecha_reserva),
-          cantidad_personas: data.cantidad_personas || 1,
-          notas: data.notas || '',
-        });
-        setError(null);
-      } catch (err) {
-        setError('No se pudo cargar la reserva.');
-        console.error('Error fetching reserva:', err);
+        setSelectedTags(data.tags || []);
+
+        if (data.cliente_id) {
+          // Cargar historial solo si hay cliente_id
+          const historialRes = await axios.get(`${API_BASE_URL}/api/reservas/cliente/${data.cliente_id}/historial`);
+          setHistorial(historialRes.data.historial || []);
+        } else {
+          setHistorial([]);
+        }
+      } catch (error) {
+        console.error('Error al cargar reserva o historial:', error);
+        setHistorial([]);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchReserva();
+    fetchReservaYHistorial();
   }, [reservaId]);
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+
+  useEffect(() => {
+    if (reserva?.cliente) {
+      setPerfilData({
+        nombre: reserva.cliente.nombre || '',
+        apellido: reserva.cliente.apellido || '',
+        cumpleanos: '',
+        empresa: '',
+        telefono: reserva.cliente.telefono || '',
+        email: reserva.cliente.correo_electronico || '',
+        membresiaNumero: '',
+        membresiaNivel: '',
+        notasPerfil: reserva.notas || '',
+        suscrito: false,
+        tagsCliente: reserva.tags || [],
+      });
+    } else {
+      setPerfilData({
+        nombre: '',
+        apellido: '',
+        cumpleanos: '',
+        empresa: '',
+        telefono: '',
+        email: '',
+        membresiaNumero: '',
+        membresiaNivel: '',
+        notasPerfil: '',
+        suscrito: false,
+        tagsCliente: [],
+      });
+    }
+  }, [reserva]);
+
+  useEffect(() => {
+    if (reserva) {
+      setSelectedTags(reserva.tags || []);
+    }
+  }, [reserva, isTagsModalOpen]);
+
+  const handlePerfilChange = (field: keyof typeof perfilData, value: string | boolean) => {
+    setPerfilData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  const handleSave = async () => {
+  const fetchHistorial = async (clienteId: number) => {
+    setLoadingHistorial(true);
     try {
-      // Actualiza datos de reserva
-      await axios.put(`${API_BASE_URL}/api/reservas/${reservaId}`, {
-        fecha_reserva: formData.fecha_reserva,
-        cantidad_personas: formData.cantidad_personas,
-        notas: formData.notas,
-      });
+      const res = await axios.get(`${API_BASE_URL}/api/reservas/cliente/${clienteId}/historial`);
+      setHistorial(res.data.historial || []);
+    } catch (error) {
+      console.error('Error al cargar historial:', error);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+  const tabs: Array<'reservas' | 'perfil' | 'actividad' | 'historial'> = ['reservas', 'perfil', 'actividad', 'historial'];
 
-      if (!reserva?.cliente_id) {
-        alert('No se pudo actualizar el cliente: cliente_id no válido.');
-        return;
-      }
+  const handleFinalizarReserva = async () => {
+    if (!reserva) return;
 
-      // Actualiza datos de cliente
-      await axios.put(`${API_BASE_URL}/api/clientes/${reserva.cliente_id}`, {
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-        correo_electronico: formData.correo_electronico,
-        telefono: formData.telefono,
-      });
+    const ahora = new Date();
+    const fechaReserva = new Date(reserva.fecha_reserva);
 
-      alert('Reserva y cliente actualizados correctamente');
-      setIsEditing(false);
+    // Si tienes la hora en horario_descripcion (ejemplo "18:30")
+    if (reserva.horario_descripcion) {
+      const [hora, minuto] = reserva.horario_descripcion.split(':');
+      fechaReserva.setHours(Number(hora));
+      fechaReserva.setMinutes(Number(minuto));
+    }
 
-      if (onReservaActualizada) onReservaActualizada();
-      onClose();
-    } catch (err) {
-      console.error('Error actualizando reserva o cliente:', err);
-      alert('Error actualizando reserva o cliente');
+    if (fechaReserva > ahora) {
+      alert('La reserva aún no ha pasado. No se puede finalizar.');
+      return;
+    }
+
+    try {
+      await axios.delete(`${API_BASE_URL}/api/reservas/${reserva.id}`);
+      alert('Reserva finalizada y eliminada.');
+      onClose(); // cierra el panel
+    } catch (error) {
+      console.error('Error al finalizar la reserva:', error);
+      alert('Error al finalizar la reserva.');
+    }
+};
+  const handleSentar = async () => {
+    if (!reserva) return;
+    setActionLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/reservas/${reserva.id}/sentar`);
+      setReserva(res.data.reserva);
+      alert('Reserva marcada como sentada');
+    } catch (error) {
+      console.error('Error al sentar la reserva:', error);
+      alert('Error al marcar como sentada');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleDelete = async () => {
-    const confirmDelete = window.confirm('¿Estás seguro que deseas eliminar esta reserva?');
-    if (!confirmDelete) return;
-
-    try {
-      await axios.delete(`${API_BASE_URL}/api/reservas/${reservaId}`);
-      alert('Reserva eliminada');
-
-      if (onReservaActualizada) onReservaActualizada();
-      onClose();
-    } catch (err) {
-      console.error('Error al eliminar reserva:', err);
-      alert('Error al eliminar reserva');
-    }
-  };
-
-  if (loading) {
+  if (loading || !reserva) {
     return (
-      <div className="fixed top-0 right-0 w-[400px] h-full bg-white p-6 shadow-lg border-l z-50">
+      <div className="fixed top-0 right-0 w-1/2 max-w-[700px] h-full bg-white p-6 shadow-lg border-l z-50 flex items-center justify-center">
         <p className="text-gray-600">Cargando reserva...</p>
       </div>
     );
   }
 
-  if (error || !reserva) {
-    return (
-      <div className="fixed top-0 right-0 w-[400px] h-full bg-white p-6 shadow-lg border-l z-50">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-red-600">Error</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-xl">
+  return (
+    <>
+      <div className="fixed top-0 right-0 w-full md:w-1/2 max-w-[700px] h-full bg-gradient-to-b from-yellow-50 to-white p-8 border-l border-yellow-300 shadow-2xl z-50 flex flex-col overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-yellow-800">{reserva.cliente?.nombre} {reserva.cliente?.apellido}</h2>
+            <p className="text-xs text-gray-600">Origen: {reserva.origen || 'Web'}</p>
+            <p className="text-xs text-gray-500">Creada el {reserva.fecha_creacion || new Date().toLocaleDateString()}</p>
+
+            {/* Tabs */}
+            <div className="flex gap-6 mt-3 text-sm text-yellow-900 border-b pb-2">
+              {tabs.map(tab => {
+                const isActive = activeTab === tab;
+                return (
+                  <motion.button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`pb-1 font-semibold transition-colors duration-300 ${
+                      isActive ? 'text-yellow-600' : 'text-yellow-900 hover:text-yellow-400'
+                    }`}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    {isActive && (
+                      <motion.div
+                        layoutId="underline"
+                        className="h-0.5 bg-yellow-500 rounded mt-1"
+                        style={{ width: '100%' }}
+                      />
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition duration-300">
             <X />
           </button>
         </div>
-        <p className="text-sm text-gray-600">{error}</p>
-      </div>
-    );
-  }
 
-  return (
-    <div className="fixed top-0 right-0 w-[400px] h-full bg-white p-6 border-l border-gray-300 shadow-lg z-50 flex flex-col">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-800">🧾 Detalle de Reserva</h2>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-xl">
-          <X />
-        </button>
-      </div>
-
-      <div className="space-y-4 text-sm text-gray-800 flex-1 overflow-y-auto">
-        {/* Nombre */}
-        <div className="flex items-center gap-2">
-          <User className="w-5 h-5 text-orange-600" />
-          {isEditing ? (
-            <input
-              type="text"
-              value={formData.nombre}
-              onChange={(e) => handleChange('nombre', e.target.value)}
-              className="w-full border border-gray-300 rounded px-2 py-1"
-              placeholder="Nombre"
-            />
-          ) : (
-            <p>
-              <strong>Cliente:</strong> {formData.nombre} {formData.apellido}
-            </p>
-          )}
-        </div>
-
-        {/* Apellido */}
-        <div className="flex items-center gap-2">
-          <User className="w-5 h-5 text-orange-600" />
-          {isEditing ? (
-            <input
-              type="text"
-              value={formData.apellido}
-              onChange={(e) => handleChange('apellido', e.target.value)}
-              className="w-full border border-gray-300 rounded px-2 py-1"
-              placeholder="Apellido"
-            />
-          ) : null}
-        </div>
-
-        {/* Teléfono */}
-        <div className="flex items-center gap-2">
-          <Phone className="w-5 h-5 text-green-600" />
-          {isEditing ? (
-            <input
-              type="tel"
-              value={formData.telefono}
-              onChange={(e) => handleChange('telefono', e.target.value)}
-              className="w-full border border-gray-300 rounded px-2 py-1"
-              placeholder="Teléfono"
-            />
-          ) : (
-            formData.telefono && <p>{formData.telefono}</p>
-          )}
-        </div>
-
-        {/* Correo */}
-        <div className="flex items-center gap-2">
-          <Mail className="w-5 h-5 text-blue-600" />
-          {isEditing ? (
-            <input
-              type="email"
-              value={formData.correo_electronico}
-              onChange={(e) => handleChange('correo_electronico', e.target.value)}
-              className="w-full border border-gray-300 rounded px-2 py-1"
-              placeholder="Correo electrónico"
-            />
-          ) : (
-            formData.correo_electronico && <p>{formData.correo_electronico}</p>
-          )}
-        </div>
-
-        {/* Fecha */}
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-purple-600" />
-          {isEditing ? (
-            <input
-              type="date"
-              value={formData.fecha_reserva}
-              onChange={(e) => handleChange('fecha_reserva', e.target.value)}
-              className="border border-gray-300 rounded px-2 py-1"
-            />
-          ) : (
-            <p>{formData.fecha_reserva}</p>
-          )}
-        </div>
-
-        {/* Cantidad personas */}
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-pink-600" />
-          {isEditing ? (
-            <input
-              type="number"
-              min={1}
-              value={formData.cantidad_personas}
-              onChange={(e) => handleChange('cantidad_personas', Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 w-20"
-            />
-          ) : (
-            <p>{formData.cantidad_personas}</p>
-          )}
-        </div>
-
-        {/* Notas */}
-        <div className="flex items-center gap-2">
-          <StickyNote className="w-5 h-5 text-gray-600" />
-          {isEditing ? (
-            <textarea
-              value={formData.notas}
-              onChange={(e) => handleChange('notas', e.target.value)}
-              className="w-full border border-gray-300 rounded px-2 py-1"
-              rows={3}
-              placeholder="Notas"
-            />
-          ) : (
-            formData.notas && <p className="italic text-gray-700">{formData.notas}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="pt-4 border-t mt-6 space-y-2">
-        {!isEditing ? (
-          <>
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-2 w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-            >
-              <Edit className="w-4 h-4" />
-              Editar Reserva
-            </button>
-
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 w-full py-2 px-4 bg-red-600 text-white rounded hover:bg-red-700 transition"
-            >
-              <Trash className="w-4 h-4" />
-              Eliminar Reserva
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 w-full py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition"
-            >
-              Guardar Cambios
-            </button>
-            <button
-              onClick={() => setIsEditing(false)}
-              className="flex items-center gap-2 w-full py-2 px-4 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
-            >
-              Cancelar
-            </button>
-          </>
+        {/* Tab: Reservas */}
+        {activeTab === 'reservas' && (
+          <div className="space-y-4 text-base text-gray-800">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-orange-600" />
+              <span className="text-orange-800 font-medium">Fecha: {new Date(reserva.fecha_reserva).toLocaleDateString()}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-600" />
+              <span className="text-blue-800 font-medium">Hora: {new Date(reserva.fecha_reserva).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Users className="w-5 h-5 text-pink-600" />
+              <span className="text-pink-800 font-medium">Personas: {reserva.cantidad_personas}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-purple-600" />
+              <span className="text-purple-800 font-medium">Duración: {reserva.duracion || 3}h</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <MapPin className="w-5 h-5 text-green-600" />
+              <span className="text-green-800 font-medium">Mesa: [Salón 1 (A)] {reserva.mesa_numero || reserva.mesa_id}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <StickyNote className="w-5 h-5 text-gray-600" />
+              <span className="text-gray-700 font-medium">Notas: {reserva.notas || 'Sin notas'}</span>
+            </div>
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsTagsModalOpen(true)}>
+              <Tag className="w-5 h-5 text-yellow-600" />
+              <span className="italic text-gray-500 hover:text-yellow-600 transition">
+                {selectedTags.length > 0 ? selectedTags.join(', ') : '+ Toca para agregar tags'}
+              </span>
+            </div>
+          </div>
         )}
 
-        <button
-          onClick={onClose}
-          className="w-full mt-2 py-2 border border-gray-300 rounded hover:bg-gray-100 transition"
-        >
-          Cerrar
-        </button>
+        {/* Tab: Perfil */}
+        {activeTab === 'perfil' && (
+          <div className="text-gray-700">
+            <div className="grid grid-cols-3 gap-6 mb-6">
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900">Nombre</label>
+                <input
+                  type="text"
+                  placeholder="Nombre"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.nombre}
+                  onChange={e => handlePerfilChange('nombre', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900">Apellido</label>
+                <input
+                  type="text"
+                  placeholder="Apellido"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.apellido}
+                  onChange={e => handlePerfilChange('apellido', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900">Cumpleaños</label>
+                <input
+                  type="date"
+                  placeholder="Cumpleaños"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.cumpleanos}
+                  onChange={e => handlePerfilChange('cumpleanos', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-6 mb-6">
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900">Empresa</label>
+                <input
+                  type="text"
+                  placeholder="Empresa"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.empresa}
+                  onChange={e => handlePerfilChange('empresa', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900">Teléfono</label>
+                <input
+                  type="tel"
+                  placeholder="Teléfono"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.telefono}
+                  onChange={e => handlePerfilChange('telefono', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900">Email</label>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.email}
+                  onChange={e => handlePerfilChange('email', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-6 mb-6">
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900"># Membresía</label>
+                <input
+                  type="text"
+                  placeholder="# Membresía"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.membresiaNumero}
+                  onChange={e => handlePerfilChange('membresiaNumero', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-yellow-900">Nivel de membresía</label>
+                <input
+                  type="text"
+                  placeholder="Nivel de membresía"
+                  className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  value={perfilData.membresiaNivel}
+                  onChange={e => handlePerfilChange('membresiaNivel', e.target.value)}
+                />
+              </div>
+              <div></div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block mb-1 font-semibold text-yellow-900">Tags del cliente</label>
+              <div
+                className="bg-yellow-100 p-3 rounded cursor-pointer text-yellow-600 hover:text-yellow-800 transition"
+                onClick={() => setIsTagsModalOpen(true)}
+              >
+                {perfilData.tagsCliente.length > 0
+                  ? perfilData.tagsCliente.join(', ')
+                  : '+ Toca para agregar tags'}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block mb-1 font-semibold text-yellow-900">Nota del perfil</label>
+              <textarea
+                placeholder="Escribe una nota"
+                className="w-full bg-yellow-100 p-2 rounded text-yellow-900 placeholder-yellow-400 resize-none border border-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                rows={3}
+                value={perfilData.notasPerfil}
+                onChange={e => handlePerfilChange('notasPerfil', e.target.value)}
+              />
+            </div>
+
+            <div className="mb-6 flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={perfilData.suscrito}
+                onChange={e => handlePerfilChange('suscrito', e.target.checked)}
+                id="suscrito-lista"
+                className="accent-yellow-500"
+              />
+              <label htmlFor="suscrito-lista" className="select-none text-yellow-900">
+                Suscrito a lista de correo
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Actividad */}
+        {activeTab === 'actividad' && (
+          <div className="space-y-4">
+            {reserva.cliente ? (
+              <div className="bg-yellow-900 text-yellow-100 rounded p-4 flex flex-col gap-2">
+                <p className="text-sm">
+                  <span className="font-bold">Nombre:</span> {reserva.cliente.nombre} {reserva.cliente.apellido}
+                </p>
+                <p className="text-sm">
+                  <span className="font-bold">Correo:</span> {reserva.cliente.correo_electronico || 'No disponible'}
+                </p>
+                <p className="text-sm text-yellow-300">Origen: {reserva.origen || 'Web'}</p>
+              </div>
+            ) : (
+              <div className="bg-yellow-900 text-yellow-100 rounded p-4 flex flex-col gap-2">
+                <p className="text-sm font-semibold">Walkin</p>
+                <p className="text-sm text-yellow-300">Origen: {reserva.origen || 'Restaurant'}</p>
+              </div>
+            )}
+
+            <div className="text-xs text-yellow-700">
+              Última actualización: {new Date(reserva.fecha_creacion || '').toLocaleString()}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Historial */}
+        {activeTab === 'historial' && (
+          <div className="p-4">
+            {loadingHistorial ? (
+              <p>Cargando historial...</p>
+            ) : historial.length === 0 ? (
+              <p className="text-yellow-900 italic">No hay historial de reservas para este cliente.</p>
+            ) : (
+              <table className="w-full text-sm text-left text-yellow-900 border border-yellow-400 rounded">
+                <thead className="bg-yellow-200">
+                  <tr>
+                    <th className="px-4 py-2 border border-yellow-300">Fecha</th>
+                    <th className="px-4 py-2 border border-yellow-300">Mesa</th>
+                    <th className="px-4 py-2 border border-yellow-300">Personas</th>
+                    <th className="px-4 py-2 border border-yellow-300">Notas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historial.map((res) => (
+                    <tr key={res.id} className="hover:bg-yellow-100">
+                      <td className="px-4 py-2 border border-yellow-300">
+                        {new Date(res.fecha_reserva).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-2 border border-yellow-300">
+                        {res.mesa_numero || res.mesa_id}
+                      </td>
+                      <td className="px-4 py-2 border border-yellow-300">
+                        {res.cantidad_personas}
+                      </td>
+                      <td className="px-4 py-2 border border-yellow-300">
+                        {res.notas || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {/* Acciones */}
+        <div className="mt-8 flex flex-col gap-4">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            disabled={actionLoading || reserva.status === 'sentado'}
+            onClick={handleSentar}
+            className={`flex items-center justify-center gap-2 rounded-md py-3 px-4 text-white transition-all duration-300 ${
+              reserva.status === 'sentado' ? 'bg-green-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            <CheckCircle className="w-5 h-5" /> {reserva.status === 'sentado' ? 'Sentado' : 'Sentar'}
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center justify-center gap-2 bg-purple-600 text-white rounded-md py-3 px-4 hover:bg-purple-700 transition-all duration-300"
+          >
+            <Send className="w-5 h-5" /> Enviar
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center justify-center gap-2 bg-yellow-500 text-white rounded-md py-3 px-4 hover:bg-yellow-600 transition-all duration-300"
+          >
+            <TicketCheck className="w-5 h-5" /> Redimir código
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleFinalizarReserva}
+            className="flex items-center justify-center gap-2 bg-red-600 text-white rounded-md py-3 px-4 hover:bg-red-700 transition-all duration-300"
+          >
+            <Trash className="w-5 h-5" /> Finalizar Reserva
+          </motion.button>
+        </div>
+
       </div>
-    </div>
+
+      {/* Modal Tags */}
+      <ClientTagsModal
+        isOpen={isTagsModalOpen}
+        onClose={() => setIsTagsModalOpen(false)}
+        onSaveTags={(tags) => {
+          setSelectedTags(tags);
+          setPerfilData(prev => ({ ...prev, tagsCliente: tags }));
+        }}
+        initialSelectedTags={selectedTags}
+      />
+    </>
   );
+
 };
 
 export default ReservationDetailsPanel;
