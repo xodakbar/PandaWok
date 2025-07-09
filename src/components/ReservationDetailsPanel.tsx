@@ -24,7 +24,7 @@ interface Cliente {
 
 interface Reserva {
   id: number;
-  cliente_id: number;
+  cliente_id: number | null;
   mesa_id: number;
   fecha_reserva: string; // ISO string o "yyyy-MM-dd"
   cantidad_personas: number;
@@ -85,6 +85,7 @@ const ReservationDetailsPanel: React.FC<Props> = ({
         setError(null);
       } catch (err) {
         setError('No se pudo cargar la reserva.');
+        console.error('Error fetching reserva:', err);
       } finally {
         setLoading(false);
       }
@@ -99,26 +100,35 @@ const ReservationDetailsPanel: React.FC<Props> = ({
 
   const handleSave = async () => {
     try {
+      // Actualiza datos de reserva
       await axios.put(`${API_BASE_URL}/api/reservas/${reservaId}`, {
         fecha_reserva: formData.fecha_reserva,
         cantidad_personas: formData.cantidad_personas,
         notas: formData.notas,
       });
 
-      await axios.put(`${API_BASE_URL}/api/clientes/${reserva?.cliente_id}`, {
+      // Verifica que cliente_id exista antes de actualizar cliente
+      if (!reserva?.cliente_id) {
+        alert('No se pudo actualizar el cliente: cliente_id no válido.');
+        return;
+      }
+
+      // Actualiza datos de cliente
+      await axios.put(`${API_BASE_URL}/api/clientes/${reserva.cliente_id}`, {
         nombre: formData.nombre,
         apellido: formData.apellido,
         correo_electronico: formData.correo_electronico,
         telefono: formData.telefono,
       });
 
-      alert('Reserva actualizada');
+      alert('Reserva y cliente actualizados correctamente');
       setIsEditing(false);
 
       if (onReservaActualizada) onReservaActualizada();
       onClose();
     } catch (err) {
-      alert('Error actualizando reserva');
+      console.error('Error actualizando reserva o cliente:', err);
+      alert('Error actualizando reserva o cliente');
     }
   };
 
@@ -129,10 +139,11 @@ const ReservationDetailsPanel: React.FC<Props> = ({
     try {
       await axios.delete(`${API_BASE_URL}/api/reservas/${reservaId}`);
       alert('Reserva eliminada');
-      
+
       if (onReservaActualizada) onReservaActualizada();
       onClose();
     } catch (err) {
+      console.error('Error al eliminar reserva:', err);
       alert('Error al eliminar reserva');
     }
   };
