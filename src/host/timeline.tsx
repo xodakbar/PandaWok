@@ -5,6 +5,9 @@ import { Move } from 'lucide-react';
 import ReservationDetailsPanel from '../components/ReservationDetailsPanel';
 import NewReservationModal from '../components/NewReservationModal';
 import BlockTableModal from '../components/BlockTableModal';
+import AgregarMesaModal from '../components/NuevaMesaModal';
+import WalkInModal from '../components/WalkInModal';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -70,8 +73,10 @@ const Timeline: React.FC = () => {
   const [bloqueoSeleccionado, setBloqueoSeleccionado] = useState<BloqueoMesa | null>(null);
   const [showNewReservationModal, setShowNewReservationModal] = useState(false);
   const [showBlockTableModal, setShowBlockTableModal] = useState(false);
+  const [showAgregarMesaModal, setShowAgregarMesaModal] = useState(false);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(new Date().toISOString().split('T')[0]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showWalkInModal, setShowWalkInModal] = useState(false);
 
   useEffect(() => {
     const fetchSalones = async () => {
@@ -200,6 +205,25 @@ const Timeline: React.FC = () => {
     }
   };
 
+  const handleAgregarMesa = async (mesaData: { salon_id: number; tipo_mesa: string; tamanio: string }) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/mesas`, mesaData);
+      if (selectedSalonId) {
+        const res = await axios.get(`${API_BASE_URL}/api/mesas/salon/${selectedSalonId}/mesas`);
+        const mesasConPos = res.data.map((mesa: Mesa) => ({
+          ...mesa,
+          posX: typeof mesa.posX === 'number' && !isNaN(mesa.posX) ? mesa.posX : 50 + mesa.id * 5,
+          posY: typeof mesa.posY === 'number' && !isNaN(mesa.posY) ? mesa.posY : 50 + mesa.id * 5,
+        }));
+        setMesas(mesasConPos);
+      }
+      setShowAgregarMesaModal(false);
+    } catch (error) {
+      console.error('Error agregando mesa:', error);
+      alert('No se pudo agregar la mesa. Intenta de nuevo.');
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Panel izquierdo */}
@@ -217,29 +241,33 @@ const Timeline: React.FC = () => {
           <>
             <h2 className="text-lg font-semibold mb-2">Mesa {mesaSeleccionada.numero_mesa}</h2>
 
-            {/* Bloqueos */}
+            {/* BLOQUEOS */}
             {bloqueosMesa.length > 0 ? (
               <div className="mb-4 p-3 bg-red-100 rounded border border-red-400 text-red-800 max-h-44 overflow-auto">
-                <h3 className="font-semibold mb-2">Bloqueos para esta mesa:</h3>
+                <h3 className="font-semibold mb-2">Bloqueos:</h3>
                 {bloqueosMesa.map((bloqueo) => (
                   <div
                     key={bloqueo.id}
-                    className={`flex justify-between items-center mb-1 cursor-pointer ${bloqueoSeleccionado?.id === bloqueo.id ? 'bg-red-200' : ''}`}
+                    className={`p-2 rounded-md border text-sm mb-2 cursor-pointer transition ${
+                      bloqueoSeleccionado?.id === bloqueo.id
+                        ? 'bg-red-300 border-red-600'
+                        : 'bg-white border-red-300 hover:bg-red-200'
+                    }`}
                     onClick={() => setBloqueoSeleccionado(bloqueo)}
                   >
-                    <span>{bloqueo.hora_inicio} - {bloqueo.hora_fin} ({bloqueo.fecha})</span>
+                    <p className="font-semibold">🕒 {bloqueo.hora_inicio} - {bloqueo.hora_fin}</p>
+                    <p className="text-xs">📅 {bloqueo.fecha}</p>
                   </div>
                 ))}
 
                 {bloqueoSeleccionado && (
-                  <div className="mt-3 p-3 bg-red-200 rounded border border-red-500">
-                    <p><strong>Detalle bloqueo:</strong></p>
-                    <p>Fecha: {bloqueoSeleccionado.fecha}</p>
-                    <p>Hora Inicio: {bloqueoSeleccionado.hora_inicio}</p>
-                    <p>Hora Fin: {bloqueoSeleccionado.hora_fin}</p>
+                  <div className="mt-3 p-3 bg-red-200 rounded border border-red-500 text-sm">
+                    <p><strong>Fecha:</strong> {bloqueoSeleccionado.fecha}</p>
+                    <p><strong>Inicio:</strong> {bloqueoSeleccionado.hora_inicio}</p>
+                    <p><strong>Fin:</strong> {bloqueoSeleccionado.hora_fin}</p>
                     <button
                       onClick={() => handleUnlockTable(bloqueoSeleccionado.id)}
-                      className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                      className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
                     >
                       Desbloquear Mesa
                     </button>
@@ -247,29 +275,40 @@ const Timeline: React.FC = () => {
                 )}
               </div>
             ) : (
-              <p className="mb-4 text-gray-600">No hay bloqueos para esta mesa en la fecha seleccionada.</p>
+              <p className="mb-4 text-gray-600">No hay bloqueos para esta fecha.</p>
             )}
 
-            {/* Reservas */}
+            {/* RESERVAS */}
             {reservasMesa.length === 0 ? (
               <p className="text-gray-600">No hay reservas para esta fecha.</p>
             ) : (
-              <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-250px)]">
+              <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-280px)]">
                 {reservasMesa.map((reserva) => (
                   <div
                     key={reserva.id}
                     onClick={() => setReservaSeleccionada(reserva)}
-                    className="cursor-pointer rounded bg-white shadow-md p-3 hover:shadow-lg transition flex flex-col"
+                    className={`p-3 rounded-lg border shadow-sm cursor-pointer transition text-sm ${
+                      reservaSeleccionada?.id === reserva.id
+                        ? 'bg-orange-100 border-orange-400'
+                        : 'bg-white border-gray-300 hover:bg-orange-50'
+                    }`}
                   >
-                    <strong>{reserva.cliente_nombre} {reserva.cliente_apellido}</strong>
-                    <span>Cantidad: {reserva.cantidad_personas}</span>
-                    {reserva.horario_descripcion && <span>Horario: {reserva.horario_descripcion}</span>}
-                    {reserva.notas && <em className="text-sm text-gray-500 truncate">Notas: {reserva.notas}</em>}
+                    <div className="font-semibold text-gray-800">
+                      👤 {reserva.cliente_nombre} {reserva.cliente_apellido}
+                    </div>
+                    <div className="text-gray-700">👥 {reserva.cantidad_personas} personas</div>
+                    {reserva.horario_descripcion && (
+                      <div className="text-gray-600">🕐 {reserva.horario_descripcion}</div>
+                    )}
+                    {reserva.notas && (
+                      <div className="text-gray-500 italic truncate">📝 {reserva.notas}</div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
+            {/* ACCIONES */}
             <div className="mt-auto space-y-2 pt-4">
               <button
                 onClick={() => setShowNewReservationModal(true)}
@@ -283,8 +322,44 @@ const Timeline: React.FC = () => {
               >
                 Bloquear Mesa
               </button>
-              <button className="w-full py-3 bg-blue-600 rounded text-white font-semibold hover:bg-blue-700 transition">
+              <button
+                onClick={() => {
+                  if (!mesaSeleccionada) {
+                    alert('Selecciona una mesa primero.');
+                    return;
+                  }
+                  setShowWalkInModal(true);
+                }}
+                className="w-full py-3 bg-blue-600 rounded text-white font-semibold hover:bg-blue-700 transition"
+              >
                 Sentar Walk-in
+              </button>
+
+              <button
+                onClick={async () => {
+                  if (!mesaSeleccionada) return;
+                  if (!window.confirm(`¿Eliminar mesa ${mesaSeleccionada.numero_mesa}? Esta acción no se puede deshacer.`)) return;
+                  try {
+                    await axios.delete(`${API_BASE_URL}/api/mesas/${mesaSeleccionada.id}`);
+                    alert('Mesa eliminada correctamente');
+                    if (selectedSalonId) {
+                      const res = await axios.get(`${API_BASE_URL}/api/mesas/salon/${selectedSalonId}/mesas`);
+                      const mesasConPos = res.data.map((mesa: Mesa) => ({
+                        ...mesa,
+                        posX: typeof mesa.posX === 'number' && !isNaN(mesa.posX) ? mesa.posX : 50 + mesa.id * 5,
+                        posY: typeof mesa.posY === 'number' && !isNaN(mesa.posY) ? mesa.posY : 50 + mesa.id * 5,
+                      }));
+                      setMesas(mesasConPos);
+                    }
+                    setMesaSeleccionada(null);
+                  } catch (error) {
+                    console.error('Error eliminando mesa:', error);
+                    alert('No se pudo eliminar la mesa. Intenta de nuevo.');
+                  }
+                }}
+                className="w-full py-3 bg-red-700 rounded text-white font-semibold hover:bg-red-800 transition"
+              >
+                Eliminar Mesa
               </button>
             </div>
           </>
@@ -297,25 +372,23 @@ const Timeline: React.FC = () => {
       <main className="flex-1 p-4 relative">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">Salones y Mesas</h1>
-          <button
-            onClick={() => setIsEditMode(!isEditMode)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full shadow ${isEditMode ? 'bg-orange-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'} transition`}
-          >
-            <Move className="w-5 h-5" />
-            {isEditMode ? 'Modo mover activo' : 'Mover Mesas'}
-          </button>
-        </div>
-
-        <div className="flex overflow-x-auto space-x-4 border-b border-gray-300 mb-6 pb-2">
-          {salones.map((salon) => (
+          <div className="flex items-center gap-2">
             <button
-              key={salon.id}
-              onClick={() => setSelectedSalonId(salon.id)}
-              className={`whitespace-nowrap px-4 py-2 rounded-full font-semibold transition ${selectedSalonId === salon.id ? 'bg-orange-600 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+              onClick={() => setShowAgregarMesaModal(true)}
+              className="px-4 py-2 rounded-full bg-green-600 text-white hover:bg-green-700 transition"
             >
-              {salon.nombre}
+              Nueva Mesa
             </button>
-          ))}
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full shadow ${
+                isEditMode ? 'bg-orange-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+              } transition`}
+            >
+              <Move className="w-5 h-5" />
+              {isEditMode ? 'Modo mover activo' : 'Mover Mesas'}
+            </button>
+          </div>
         </div>
 
         <div ref={containerRef} className="relative w-full h-[calc(100vh-160px)] bg-white rounded shadow p-4">
@@ -367,7 +440,10 @@ const Timeline: React.FC = () => {
 
       {/* Modales */}
       {reservaSeleccionada && (
-        <ReservationDetailsPanel reserva={reservaSeleccionada} onClose={() => setReservaSeleccionada(null)} />
+        <ReservationDetailsPanel
+          reservaId={reservaSeleccionada.id}
+          onClose={() => setReservaSeleccionada(null)}
+        />
       )}
 
       {showNewReservationModal && mesaSeleccionada && (
@@ -379,6 +455,7 @@ const Timeline: React.FC = () => {
           onReservationCreate={(newRes) => {
             setReservaSeleccionada(newRes);
             setShowNewReservationModal(false);
+            // refrescar reservas para esa mesa y fecha
           }}
         />
       )}
@@ -387,15 +464,39 @@ const Timeline: React.FC = () => {
         <BlockTableModal
           isOpen={showBlockTableModal}
           onClose={() => setShowBlockTableModal(false)}
-          tableId={mesaSeleccionada.id}
-          currentSalonName={salones.find((s) => s.id === selectedSalonId)?.nombre || ''}
+          tableId={mesaSeleccionada?.id || null}
+          currentSalonName={salones.find(s => s.id === selectedSalonId)?.nombre || ''}
           generateTimeOptions={generateTimeOptions}
           fechaSeleccionada={fechaSeleccionada}
-          onBlock={handleBlockTable}
+          onBlock={(tableId, startTime, endTime, fecha) => {
+            handleBlockTable(tableId, startTime, endTime, fecha);
+            setShowBlockTableModal(false);
+          }}
         />
       )}
-    </div>
-  );
-};
+      {showWalkInModal && mesaSeleccionada && (
+        <WalkInModal
+          mesaId={mesaSeleccionada.id}
+          mesaNumero={mesaSeleccionada.numero_mesa}
+          fechaSeleccionada={fechaSeleccionada}
+          onClose={() => setShowWalkInModal(false)}
+          onReservaCreada={(nuevaReserva) => {
+            setReservasMesa((prev) => [...prev, nuevaReserva]);
+            setReservaSeleccionada(nuevaReserva);
+            setShowWalkInModal(false);
+          }}
+        />
+      )}
+
+            {showAgregarMesaModal && (
+              <AgregarMesaModal
+                salones={salones}
+                onClose={() => setShowAgregarMesaModal(false)}
+                onAgregar={handleAgregarMesa}
+              />
+            )}
+          </div>
+        );
+      };
 
 export default Timeline;
