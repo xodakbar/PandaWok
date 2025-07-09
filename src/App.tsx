@@ -9,6 +9,7 @@ import RequestPage from './host/RequestPage';
 import Header from './components/Header';
 import ListaEsperaPage from './host/ListaEsperaPage';
 import AdminUsersPage from './host/AdminUsersPage';
+import MesaBloqueosPage from './host/MesaBloqueosPage'; // <-- Importa tu página aquí
 
 // Mock de salones para el header
 const mockSalones = [
@@ -93,6 +94,19 @@ function App() {
               <>
                 <Header salones={mockSalones} />
                 <AdminUsersPage />
+              </>
+            </PrivateRoute>
+          }
+        />
+
+        {/* Nueva ruta privada para MesaBloqueosPage */}
+        <Route
+          path="/mesa-bloqueos"
+          element={
+            <PrivateRoute>
+              <>
+                <Header salones={mockSalones} />
+                <MesaBloqueosPage />
               </>
             </PrivateRoute>
           }

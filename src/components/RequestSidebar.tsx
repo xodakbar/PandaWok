@@ -1,15 +1,6 @@
 // src/components/RequestSidebar.tsx
 import React from 'react';
 
-// Si tus solicitudes de reserva tienen un tipo definido, lo pondrías aquí.
-// Por ejemplo:
-// interface ReservationRequest {
-//   id: string;
-//   clientName: string;
-//   date: string;
-//   time: string;
-//   guests: number;
-// }
 
 
 interface RequestSidebarProps {
@@ -41,20 +32,7 @@ const RequestSidebar: React.FC<RequestSidebarProps> = ({ isOpen, onClose }) => {
           <p className="text-gray-400 text-center mt-8">
             Aquí se mostrarían las solicitudes de reserva pendientes.
           </p>
-          {/* Aquí iría la lógica para listar y gestionar las solicitudes */}
-          {/* Ejemplo de una solicitud (descomentar y adaptar): */}
-          {/*
-          <div className="bg-[#33334F] p-3 rounded-md mb-3">
-            <p className="text-lg font-medium">Cliente: Juan Pérez</p>
-            <p>Fecha: 5 Jul, 2025</p>
-            <p>Hora: 20:00</p>
-            <p>Personas: 4</p>
-            <div className="mt-2 flex justify-end space-x-2">
-              <button className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">Aceptar</button>
-              <button className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Rechazar</button>
-            </div>
-          </div>
-          */}
+         
         </div>
       </div>
     </div>
