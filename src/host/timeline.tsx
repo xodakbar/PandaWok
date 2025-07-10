@@ -418,6 +418,26 @@ const Timeline: React.FC = () => {
       <main className="flex-1 p-4 relative">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">Salones y Mesas</h1>
+          {/* Tabs de Salones */}
+          <div className="mb-4 border-b border-gray-300">
+            <nav className="flex space-x-4 overflow-x-auto">
+              {salones.map((salon) => (
+                <button
+                  key={salon.id}
+                  onClick={() => setSelectedSalonId(salon.id)}
+                  className={`py-2 px-4 whitespace-nowrap rounded-t-lg font-semibold ${
+                    selectedSalonId === salon.id
+                      ? 'bg-orange-500 text-white shadow'
+                      : 'text-gray-600 hover:text-orange-600'
+                  } transition`}
+                  title={`Capacidad: ${salon.capacidad}${salon.es_condicion_especial ? ' (Condición especial)' : ''}`}
+                >
+                  {salon.nombre}
+                </button>
+              ))}
+            </nav>
+          </div>
+
           <div className="flex items-center gap-2">
             <motion.button
               whileHover={{ scale: 1.03 }}
